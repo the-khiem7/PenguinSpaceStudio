@@ -4,12 +4,12 @@ pack: "penguin-space"
 document: "sourcecode"
 status: "active"
 updated: "2026-08-10"
-code_ref: "worktree-m1"
+code_ref: "5ba3fe8"
 ---
 
 # Architecture and M1 implementation
 
-The M1 bootstrap is implemented in the worktree. `main.go` hosts the Wails application, `AppService` exposes typed bindings, `internal/core` owns the fixture lifecycle, and `internal/history` persists verified fixture outcomes. The broader provider, Docker/WSL, project-discovery, and elevation designs remain planned rather than implemented.
+The M1 bootstrap is implemented in commit `5ba3fe8`. `main.go` hosts the Wails application, `AppService` exposes typed bindings, `internal/core` owns the fixture lifecycle, and `internal/history` persists verified fixture outcomes. The broader provider, Docker/WSL, project-discovery, and elevation designs remain planned rather than implemented.
 
 ```mermaid
 flowchart LR

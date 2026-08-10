@@ -4,7 +4,7 @@ pack: "penguin-space"
 document: "useguide"
 status: "draft"
 updated: "2026-08-10"
-code_ref: "worktree-m1"
+code_ref: "5ba3fe8"
 ---
 
 # Intended product interaction contract

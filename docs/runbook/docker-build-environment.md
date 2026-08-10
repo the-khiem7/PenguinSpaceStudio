@@ -4,7 +4,7 @@
 
 PenguinSpace is a Windows-first desktop application using Wails 3, Go, Vue, Vite, and Bun. This runbook makes its build environment a Docker-only boundary: the Windows host is an editor and container orchestrator, not a place to install project toolchains or SDKs.
 
-The M1 worktree contains `Dockerfile`, `docker-compose.yml`, Compose delegates, and a Wails/Go/Vue shell. The toolchain was verified through Docker and produced a Windows executable; a hidden five-second process-start smoke test passed. Interactive UI acceptance and installer/package creation remain separate work.
+M1 bootstrap is committed on `main` as `5ba3fe8` and contains `Dockerfile`, `docker-compose.yml`, Compose delegates, and a Wails/Go/Vue shell. The toolchain was verified through Docker and produced a Windows executable; a hidden five-second process-start smoke test passed. Interactive UI acceptance and installer/package creation remain separate work.
 
 ## Mandatory build-environment policy
 
@@ -87,7 +87,7 @@ There is no standing exception for a host toolchain. A temporary host install re
 
 ## Bootstrap acceptance checklist
 
-- [ ] Dockerfile and Compose manifest are committed. (Created in M1 worktree; not committed.)
+- [x] Dockerfile and Compose manifest are committed in `5ba3fe8`.
 - [x] Go, Wails 3, Vue/Bun, and Windows build dependencies execute only in containers.
 - [x] Go, package-manager, and build caches stay out of the host profile and source checkout.
 - [x] `verify`, `build-windows`, and `shell` delegate only to Docker.

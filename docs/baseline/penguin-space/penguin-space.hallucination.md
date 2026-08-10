@@ -4,7 +4,7 @@ pack: "penguin-space"
 document: "hallucination"
 status: "active"
 updated: "2026-08-10"
-code_ref: "worktree-m1"
+code_ref: "5ba3fe8"
 ---
 
 # Decisions, unknowns, and claim boundaries

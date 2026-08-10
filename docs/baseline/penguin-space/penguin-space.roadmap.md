@@ -4,7 +4,7 @@ pack: "penguin-space"
 document: "roadmap"
 status: "active"
 updated: "2026-08-10"
-code_ref: "worktree-m1"
+code_ref: "5ba3fe8"
 ---
 
 # Product roadmap and verification state
@@ -50,7 +50,7 @@ Close the following decisions with an evidence record for each: pinned container
 
 **Verification gate:** a clean Windows host, without PenguinSpace Go/Wails/Bun/Windows build SDK toolchains, can run the containerized verification path; then provider and plan tests plus an end-to-end Windows run. A build alone is insufficient.
 
-**Implementation checkpoint (2026-08-10):** the uncommitted M1 worktree contains `Dockerfile`, `docker-compose.yml`, Docker-only PowerShell delegates, `go.mod`, Vue/Vite/Bun frontend sources, Wails service bindings, and a schema-versioned SQLite history store. `docker compose run --rm verify` passed Bun `1.3.14`, Go `1.25.12`, Wails CLI `v3.0.0-beta.6`, Vue type-check/build, Go vet/tests for `internal`, and a Windows `CGO_ENABLED=0` cross-compile. `docker compose run --rm build` produced `out/penguinspace.exe`; a hidden five-second Windows process-start smoke test passed and the test process was stopped. The only executable provider is an in-memory fixture: it covers scan → plan → confirmation gate → execute → verify → SQLite history and deliberately invokes no filesystem or tool command.
+**Implementation checkpoint (2026-08-10):** M1 bootstrap is committed on `main` as `5ba3fe8`. It contains `Dockerfile`, `docker-compose.yml`, Docker-only PowerShell delegates, `go.mod`, Vue/Vite/Bun frontend sources, Wails service bindings, and a schema-versioned SQLite history store. `docker compose run --rm verify` passed Bun `1.3.14`, Go `1.25.12`, Wails CLI `v3.0.0-beta.6`, Vue type-check/build, Go vet/tests for `internal`, and a Windows `CGO_ENABLED=0` cross-compile. `docker compose run --rm build` produced `out/penguinspace.exe`; a hidden five-second Windows process-start smoke test passed and the test process was stopped. The only executable provider is an in-memory fixture: it covers scan → plan → confirmation gate → execute → verify → SQLite history and deliberately invokes no filesystem or tool command.
 
 **Remaining M1 closure work:** prototype the real Windows `runas` helper and cancellation/timeout behavior, then perform an interactive Windows UI smoke test. Do not mark a real provider, cleanup command, installer/package, or physical reclaim outcome as implemented.
 

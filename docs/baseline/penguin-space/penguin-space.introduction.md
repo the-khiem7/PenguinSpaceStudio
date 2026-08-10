@@ -4,7 +4,7 @@ pack: "penguin-space"
 document: "introduction"
 status: "active"
 updated: "2026-08-10"
-code_ref: "worktree-m1"
+code_ref: "5ba3fe8"
 ---
 
 # PenguinSpace baseline
@@ -37,7 +37,7 @@ It is not a generic PC cleaner or merely a GUI for cache-clearing commands. Its 
 
 ## Current truth
 
-- Milestone 1 bootstrap implementation exists in the uncommitted worktree: a pinned Docker toolchain, Wails/Go/Vue shell, SQLite history store, and a fixture-only provider lifecycle.
+- Milestone 1 bootstrap implementation is committed in `5ba3fe8`: a pinned Docker toolchain, Wails/Go/Vue shell, SQLite history store, and a fixture-only provider lifecycle.
 - The root `PROPOSAL.md`, which was an already staged newly added file, was removed after byte-identical preservation in this pack.
 - The product decisions recorded in this pack are approved direction, not proof that a provider, UI, command, integration, cleanup, or VHDX operation currently works.
 - Docker-only verification and Windows cross-build pass through Compose. The generated Windows executable launched successfully for five seconds on the host in a hidden smoke test, then was stopped; this is process-start evidence, not interactive UI acceptance.
