@@ -3,8 +3,8 @@ baseline_schema: "2.0"
 pack: "penguin-space"
 document: "roadmap"
 status: "active"
-updated: "2026-08-10"
-code_ref: "worktree-m1-elevation-after-e3f7522"
+updated: "2026-08-11"
+code_ref: "6ee788d"
 ---
 
 # Product roadmap and verification state
@@ -52,9 +52,9 @@ Close the following decisions with an evidence record for each: pinned container
 
 **Implementation checkpoint (2026-08-10):** M1 bootstrap is committed on `main` as `5ba3fe8`. It contains `Dockerfile`, `docker-compose.yml`, Docker-only PowerShell delegates, `go.mod`, Vue/Vite/Bun frontend sources, Wails service bindings, and a schema-versioned SQLite history store. `docker compose run --rm verify` passed Bun `1.3.14`, Go `1.25.12`, Wails CLI `v3.0.0-beta.6`, Vue type-check/build, Go vet/tests for `internal`, and a Windows `CGO_ENABLED=0` cross-compile. `docker compose run --rm build` produced `out/penguinspace.exe`; a hidden five-second Windows process-start smoke test passed and the test process was stopped. The only executable provider is an in-memory fixture: it covers scan → plan → confirmation gate → execute → verify → SQLite history and deliberately invokes no filesystem or tool command.
 
-**Remaining M1 closure work:** perform interactive Windows UAC acceptance, refusal, cancellation, timeout, and UI smoke tests. Do not mark a real provider, cleanup command, installer/package, or physical reclaim outcome as implemented.
+**Remaining M1 closure work:** fix duplicate-start UX, add controlled safe delay/timeout probe modes, then perform interactive Windows UAC refusal, cancellation, timeout, and final UI smoke tests. The UAC-success no-op probe was observed in the visible UI on 2026-08-11. Do not mark a real provider, cleanup command, installer/package, or physical reclaim outcome as implemented.
 
-**Elevation continuation checkpoint (2026-08-10):** uncommitted work after `e3f7522` adds `internal/elevation`: a versioned, fixed `m1.elevation.probe` contract, JSON request/result files below the per-user application directory, allow-list validation, cancellation marker, terminal statuses, and controller tests for success, cancellation, timeout, expired contracts, and an unknown action. The Windows-only launcher uses `ShellExecute` with the `runas` verb to re-run PenguinSpace in helper mode; the helper accepts only a request ID and executes a no-op probe. The Vue shell exposes start, status polling, and cancellation. No cleanup command, target path, provider command, or physical storage mutation can cross this bridge. Docker `verify` passed Bun `1.3.14`, Go `1.25.12`, Wails bindings for 7 service methods, Vue type-check/build, gofmt, vet, all internal tests, and a Windows cross-build. Docker `build` produced `out/penguinspace.exe` (13,544,960 bytes); a hidden five-second Windows process-start smoke test passed and the exact test process was stopped. `git diff --check` passed. Interactive UAC consent/refusal/cancellation/timeout and visible UI acceptance remain unverified.
+**Elevation continuation checkpoint (2026-08-11):** commit `6ee788d` adds `internal/elevation`: a versioned, fixed `m1.elevation.probe` contract, JSON request/result files below the per-user application directory, allow-list validation, cancellation marker, terminal statuses, and controller tests for success, cancellation, timeout, expired contracts, and an unknown action. The Windows-only launcher uses `ShellExecute` with the `runas` verb to re-run PenguinSpace in helper mode; the helper accepts only a request ID and executes a no-op probe. The Vue shell exposes start, status polling, and cancellation. No cleanup command, target path, provider command, or physical storage mutation can cross this bridge. Docker `verify` passed Bun `1.3.14`, Go `1.25.12`, Wails bindings for 7 service methods, Vue type-check/build, gofmt, vet, all internal tests, and a Windows cross-build. Docker `build` produced `out/penguinspace.exe` (13,544,960 bytes); a hidden five-second Windows process-start smoke test passed and the exact test process was stopped. The user then ran the visible application and supplied UI evidence of `Succeeded` for the no-op elevation probe. A repeated start request displayed `already in progress` before that first operation rendered its terminal status; the guard behaved safely, but the UI needs immediate pending-state feedback. UAC refusal, cancellation, timeout, and the remaining visible UI acceptance are unverified.
 
 ## Milestone 2 — Developer tool ecosystems
 
@@ -119,7 +119,7 @@ Cover failure recovery, locked files, permission failures, malformed output, par
 
 ## Exact next action
 
-Close the remaining M1 Windows-runtime gate: interactively validate UAC consent, refusal, cancellation, timeout, and the generated Windows shell. Keep the fixture non-destructive; begin M2 provider implementation only after those checks have evidence.
+Fix the elevation probe UI's duplicate-start feedback and add controlled no-op delay/timeout modes; rebuild and verify in Docker, then interactively validate UAC refusal, cancellation, timeout, and the generated Windows shell. Keep the fixture non-destructive; begin M2 provider implementation only after those checks have evidence.
 
 ## Pack migration verification
 

@@ -3,15 +3,15 @@ baseline_schema: "2.0"
 pack: "penguin-space"
 document: "sourcecode"
 status: "active"
-updated: "2026-08-10"
-code_ref: "worktree-m1-elevation-after-e3f7522"
+updated: "2026-08-11"
+code_ref: "6ee788d"
 ---
 
 # Architecture and M1 implementation
 
 The M1 bootstrap is implemented in commit `5ba3fe8`. `main.go` hosts the Wails application, `AppService` exposes typed bindings, `internal/core` owns the fixture lifecycle, and `internal/history` persists verified fixture outcomes. The broader provider, Docker/WSL, and project-discovery designs remain planned rather than implemented; the limited elevation prototype is described below.
 
-The M1 elevation continuation is in the worktree after `e3f7522`. `internal/elevation` owns a fixed `m1.elevation.probe` request contract, persistence, helper execution, and a status controller. `elevation_launcher_windows.go` launches the current executable through the Windows `runas` verb; `elevated_helper.go` accepts only `--elevated-helper --elevation-request-id <opaque-id>`, then loads and validates the stored request. The only allow-listed action is a no-op probe. A cancellation marker and expiry result in `cancelled` or `timed-out`; no provider command, cleanup path, or arbitrary process is represented in the contract. Docker verification and Windows cross-build passed; this code awaits an interactive Windows UAC run.
+The M1 elevation continuation is implemented in `6ee788d`. `internal/elevation` owns a fixed `m1.elevation.probe` request contract, persistence, helper execution, and a status controller. `elevation_launcher_windows.go` launches the current executable through the Windows `runas` verb; `elevated_helper.go` accepts only `--elevated-helper --elevation-request-id <opaque-id>`, then loads and validates the stored request. The only allow-listed action is a no-op probe. A cancellation marker and expiry result in `cancelled` or `timed-out`; no provider command, cleanup path, or arbitrary process is represented in the contract. Docker verification and Windows cross-build passed, and the user observed the visible probe finish as `Succeeded`; refusal, cancellation, timeout, and duplicate-start UI feedback remain to be verified or improved.
 
 ```mermaid
 flowchart LR
