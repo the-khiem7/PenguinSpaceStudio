@@ -32,12 +32,14 @@ It is not a generic PC cleaner or merely a GUI for cache-clearing commands. Its 
 | Cleanup safety | Scan, measure, classify, review, confirm, execute, verify | Decided / locked |
 | Cleanup implementation | Prefer official/tool-native commands; filesystem deletion only as an understood, classified fallback | Decided / locked |
 | Privileges | Normal execution without Administrator rights; elevate only for operations that require it | Decided / locked |
+| Build environment | Docker-only toolchain boundary: the Windows host may edit, use Git, and orchestrate Docker, but must not run or install PenguinSpace build SDKs/toolchains | Decided / locked; [runbook](../../runbook/docker-build-environment.md) |
 
 ## Current truth
 
 - The repository contains no implementation files and has no Git commits; implementation is **unverified / not started**.
 - The root `PROPOSAL.md`, which was an already staged newly added file, was removed after byte-identical preservation in this pack.
 - The product decisions recorded in this pack are approved direction, not proof that a provider, UI, command, integration, cleanup, or VHDX operation currently works.
+- The Docker-only build policy is an approved implementation contract. No Dockerfile, Compose manifest, container service, or local Docker build has been implemented or verified yet.
 - Commands and external-documentation behaviour are time-sensitive and must be verified against current official sources before a provider is implemented.
 
 ## Storage model

@@ -17,14 +17,28 @@ code_ref: "uncommitted"
 | Core adaptive pack | Complete | Introduction, roadmap, and decision/unknowns documents created |
 | Architecture and usage contract | Complete | Source-code and use-guide documents created because the proposal defines both materially |
 | Root proposal deletion | Complete | Root source removed after SHA-256 equality and pack-coverage verification |
+| Phase 0 — Research and decision closure | Not started | All nine implementation decisions are assigned here; no research result is yet accepted as product fact |
 | Product implementation | Not started / unverified | Repository has no commits or implementation files |
+
+## Phase 0 — Research and decision closure
+
+**Depends on:** no product milestone. This phase converts the approved product direction and Docker-only build policy into evidence-backed implementation decisions. It does not implement a cleanup provider or perform destructive cleanup.
+
+Close the following decisions with an evidence record for each: pinned container toolchain and Windows packaging feasibility; supported tool versions and provider command/API details; storage calculation/rounding; settings/history/diagnostic persistence; Wails-to-Windows elevation bridge; WSL/VHDX compaction; project-root discovery defaults; and Danger confirmation language.
+
+**Required outputs:** a decision register containing owner, scope, current official/source evidence, test or spike result, chosen approach, rejected alternatives where safety-relevant, and follow-on implementation task. The Docker decision must also define the proposed `verify`, `build`, and `shell` Compose responsibilities and cache boundary from [the Docker build runbook](../../runbook/docker-build-environment.md).
+
+**Acceptance criteria:** every current open decision is either closed with the required evidence or explicitly deferred with owner, reason, risk, and a blocking/non-blocking designation. The list in [penguin-space.hallucination.md](penguin-space.hallucination.md) is synchronized so it contains only genuinely open items.
+
+**Verification gate:** no implementation milestone begins on an unverified assumption that Phase 0 identifies as blocking. A research note, a successful image build, or a static check alone is not sufficient evidence for a closed runtime decision.
 
 ## Milestone 1 — Core platform
 
-**Depends on:** no product milestone.
+**Depends on:** Phase 0 decisions marked blocking for the Docker build environment, measurement model, persistence, elevation, and initial provider contract.
 **Target:** establish the final architecture, not a throwaway MVP.
 
 - Wails 3 app shell and Vue shell
+- Dockerfile and Compose manifest with pinned, container-owned toolchains and `verify`, `build`, and `shell` responsibilities
 - WinUI-inspired design system and navigation shell
 - domain models, provider interface, detection/scanning, planning, execution, verification
 - storage measurement, risk and recovery-cost models, history persistence
@@ -32,11 +46,11 @@ code_ref: "uncommitted"
 
 **Acceptance criteria:** the app can scan a test provider through the full scan → plan → confirm → execute → verify pipeline without frontend-owned shell commands; results expose risk, recovery cost, estimates, status, and actual reclaimed bytes where measurable.
 
-**Verification gate:** provider and plan tests plus an end-to-end Windows run. A build alone is insufficient.
+**Verification gate:** a clean Windows host, without PenguinSpace Go/Wails/Node/Windows build SDK toolchains, can run the containerized verification path; then provider and plan tests plus an end-to-end Windows run. A build alone is insufficient.
 
 ## Milestone 2 — Developer tool ecosystems
 
-**Depends on:** Milestone 1 provider contract.
+**Depends on:** Phase 0 provider research and Milestone 1 provider contract.
 
 Implement detection, inspection, estimate, plan, cleanup, and verification for Node.js (npm, pnpm, Yarn, Bun), Python (uv), .NET (NuGet), Rust (Cargo), Java/JVM (Gradle, Maven), and Cypress/Playwright.
 
@@ -46,7 +60,7 @@ Implement detection, inspection, estimate, plan, cleanup, and verification for N
 
 ## Milestone 3 — Containers and WSL
 
-**Depends on:** Milestone 1; Docker and Windows/WSL test environments.
+**Depends on:** Phase 0 Docker/WSL findings; Milestone 1; Docker and Windows/WSL test environments.
 
 Implement Docker/Docker Desktop/Rancher awareness; independent resource inspection and cleanup for images, containers, build cache, networks, and volumes; WSL distro and VHDX discovery; physical/logical measurement; compactability estimation; elevation, shutdown warnings, compaction, and post-operation verification.
 
@@ -92,11 +106,12 @@ Cover failure recovery, locked files, permission failures, malformed output, par
 | Docker volumes contain state | Irrecoverable loss | Danger classification, no preselection, strengthened confirmation |
 | Logical cleanup does not shrink VHDX | Misleading reclaimed-space claim | Separate logical, estimated compactable, and actual physical results |
 | UAC or environment shutdown fails | Cleanup/compaction stops partway | Plan-time privilege/shutdown indication, cancellation and recovery handling |
+| Host toolchain drift or cache pollution | Non-reproducible builds and WSL/Docker storage pressure | Keep all project toolchains and caches in pinned container images or named volumes; do not bind-mount host SDK/cache directories |
 | No code exists yet | Direction may be mistaken for implemented reality | Keep all status claims explicitly planned or unverified |
 
 ## Exact next action
 
-Create the Wails 3/Go/Vue application shell and a single fixture-backed provider-contract vertical slice that produces a reviewable cleanup plan but performs no destructive cleanup.
+Start Phase 0 by creating the decision register and resolving the Docker build-image contract through a non-destructive container spike; record the result before creating the Wails 3/Go/Vue application shell.
 
 ## Pack migration verification
 

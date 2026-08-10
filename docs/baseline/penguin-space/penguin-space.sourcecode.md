@@ -34,6 +34,12 @@ flowchart LR
 - The verification engine remeasures provider state and physical disk state when meaningful, then records actual outcomes.
 - Docker resource classes and virtual disks are not treated as interchangeable cache locations.
 
+## Build-environment boundary
+
+All project dependency installation, code generation, verification, tests, builds, and packaging are planned to execute inside Docker. The Windows host may run the editor, Git, Rancher Desktop/Docker, and `docker compose` only as the orchestrator; it must not provide a Go, Wails, Node/Vue, or Windows packaging toolchain for PenguinSpace.
+
+The planned Compose contract has three responsibilities: `verify` for locked dependency installation and static/test checks, `build` for the Windows package, and `shell` for disposable diagnostics. Toolchain and dependency caches belong to container-managed paths or Docker named volumes, never host SDK/cache bind mounts. A deliberately exported installer may use `out/` as a release artifact location.
+
 ## Provider lifecycle
 
 ```text
