@@ -1,0 +1,12 @@
+# Generated application artifacts
+bin/
+out/
+frontend/dist/
+frontend/node_modules/
+frontend/bindings/
+frontend/*.tsbuildinfo
+
+# Local tool and editor state
+.env
+.idea/
+.vscode/

@@ -1,0 +1,30 @@
+version: '3'
+
+vars:
+  APP_NAME: penguinspace
+  BIN_DIR: out
+  PACKAGE_MANAGER: bun
+  GOOS: '{{.GOOS | default "windows"}}'
+  GOARCH: '{{.GOARCH | default "amd64"}}'
+
+tasks:
+  install:frontend:
+    dir: frontend
+    cmds:
+      - bun install --frozen-lockfile
+
+  generate:bindings:
+    cmds:
+      - GOOS=windows CGO_ENABLED=0 wails3 generate bindings -clean=true -ts -i
+
+  build:frontend:
+    deps: [install:frontend, generate:bindings]
+    dir: frontend
+    cmds:
+      - bun run build
+
+  build:
+    deps: [build:frontend]
+    cmds:
+      - mkdir -p {{.BIN_DIR}}
+      - GOOS={{.GOOS}} GOARCH={{.GOARCH}} CGO_ENABLED=0 go build -tags production -trimpath -buildvcs=false -ldflags='-w -s -H windowsgui' -o {{.BIN_DIR}}/{{.APP_NAME}}.exe .

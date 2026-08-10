@@ -4,12 +4,12 @@ pack: "penguin-space"
 document: "useguide"
 status: "draft"
 updated: "2026-08-10"
-code_ref: "uncommitted"
+code_ref: "worktree-m1"
 ---
 
 # Intended product interaction contract
 
-This is a planned user-facing contract, not a claim that the application currently exists.
+This is the Product Goal interaction contract. M1 now implements its left-navigation shell and a visible fixture lifecycle panel; all other pages and real cleanup workflows remain planned.
 
 ## Navigation and layout
 
@@ -24,6 +24,8 @@ Launch → Scan → Measure → Classify → Dashboard → Review & Clean → Cl
 ```
 
 The application must not run cleanup as part of scanning or at launch. Home is observability and routes the user to **Review & Clean**.
+
+M1's only runnable lifecycle is deliberately non-destructive: it scans one in-memory fixture, produces one Safe plan, requires backend confirmation, mutates no filesystem/tool state, verifies exact fixture bytes, and records history. It demonstrates the boundary only; it is not user-facing cleanup support.
 
 ## Home contract
 

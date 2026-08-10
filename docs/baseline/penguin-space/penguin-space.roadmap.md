@@ -4,7 +4,7 @@ pack: "penguin-space"
 document: "roadmap"
 status: "active"
 updated: "2026-08-10"
-code_ref: "uncommitted"
+code_ref: "worktree-m1"
 ---
 
 # Product roadmap and verification state
@@ -18,7 +18,7 @@ code_ref: "uncommitted"
 | Architecture and usage contract | Complete | Source-code and use-guide documents created because the proposal defines both materially |
 | Root proposal deletion | Complete | Root source removed after SHA-256 equality and pack-coverage verification |
 | Phase 0 — Research and decision closure | Complete with scoped deferrals | Nine decisions were resolved or explicitly deferred in the Phase 0 register; Docker-only toolchain spike passed without a host SDK |
-| Product implementation | Not started / unverified | Repository has no commits or implementation files |
+| Product implementation | M1 bootstrap implemented; milestone remains in progress | Pinned Docker verification, frontend build, Go tests, Windows cross-build, and hidden process-start smoke test passed; real provider/elevation/package work remains |
 
 ## Phase 0 — Research and decision closure
 
@@ -49,6 +49,10 @@ Close the following decisions with an evidence record for each: pinned container
 **Acceptance criteria:** the app can scan a test provider through the full scan → plan → confirm → execute → verify pipeline without frontend-owned shell commands; results expose risk, recovery cost, estimates, status, and actual reclaimed bytes where measurable.
 
 **Verification gate:** a clean Windows host, without PenguinSpace Go/Wails/Bun/Windows build SDK toolchains, can run the containerized verification path; then provider and plan tests plus an end-to-end Windows run. A build alone is insufficient.
+
+**Implementation checkpoint (2026-08-10):** the uncommitted M1 worktree contains `Dockerfile`, `docker-compose.yml`, Docker-only PowerShell delegates, `go.mod`, Vue/Vite/Bun frontend sources, Wails service bindings, and a schema-versioned SQLite history store. `docker compose run --rm verify` passed Bun `1.3.14`, Go `1.25.12`, Wails CLI `v3.0.0-beta.6`, Vue type-check/build, Go vet/tests for `internal`, and a Windows `CGO_ENABLED=0` cross-compile. `docker compose run --rm build` produced `out/penguinspace.exe`; a hidden five-second Windows process-start smoke test passed and the test process was stopped. The only executable provider is an in-memory fixture: it covers scan → plan → confirmation gate → execute → verify → SQLite history and deliberately invokes no filesystem or tool command.
+
+**Remaining M1 closure work:** prototype the real Windows `runas` helper and cancellation/timeout behavior, then perform an interactive Windows UI smoke test. Do not mark a real provider, cleanup command, installer/package, or physical reclaim outcome as implemented.
 
 ## Milestone 2 — Developer tool ecosystems
 
@@ -113,7 +117,7 @@ Cover failure recovery, locked files, permission failures, malformed output, par
 
 ## Exact next action
 
-Create the Dockerfile and Compose manifest using the Phase 0 pinned Bun-first toolchain decision, then implement container-only `verify`, `build`, and `shell` scripts before creating the Wails 3/Go/Vue application shell and one fixture-backed provider-contract vertical slice. It must produce a reviewable cleanup plan but perform no destructive cleanup.
+Close the remaining M1 Windows-runtime gate: prototype the constrained `runas` helper and cancellation/timeout path, then interactively validate the generated Windows shell. Keep the fixture non-destructive; begin M2 provider implementation only after those checks have evidence.
 
 ## Pack migration verification
 

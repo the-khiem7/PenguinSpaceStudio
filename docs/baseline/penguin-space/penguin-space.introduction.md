@@ -4,7 +4,7 @@ pack: "penguin-space"
 document: "introduction"
 status: "active"
 updated: "2026-08-10"
-code_ref: "uncommitted"
+code_ref: "worktree-m1"
 ---
 
 # PenguinSpace baseline
@@ -37,10 +37,12 @@ It is not a generic PC cleaner or merely a GUI for cache-clearing commands. Its 
 
 ## Current truth
 
-- The repository contains no implementation files and has no Git commits; implementation is **unverified / not started**.
+- Milestone 1 bootstrap implementation exists in the uncommitted worktree: a pinned Docker toolchain, Wails/Go/Vue shell, SQLite history store, and a fixture-only provider lifecycle.
 - The root `PROPOSAL.md`, which was an already staged newly added file, was removed after byte-identical preservation in this pack.
 - The product decisions recorded in this pack are approved direction, not proof that a provider, UI, command, integration, cleanup, or VHDX operation currently works.
-- The Docker-only build policy is an approved implementation contract. No Dockerfile, Compose manifest, container service, or local Docker build has been implemented or verified yet.
+- Docker-only verification and Windows cross-build pass through Compose. The generated Windows executable launched successfully for five seconds on the host in a hidden smoke test, then was stopped; this is process-start evidence, not interactive UI acceptance.
+- The fixture lifecycle scans, plans, requires confirmation, executes only an in-memory change, verifies exact reclaimed bytes, and persists a history record. It is not an implementation of any real cleanup provider or command.
+- Real provider integrations, Windows elevation/runtime behavior, package/installer creation, and full interactive UI QA remain unverified.
 - Commands and external-documentation behaviour are time-sensitive and must be verified against current official sources before a provider is implemented.
 
 ## Storage model

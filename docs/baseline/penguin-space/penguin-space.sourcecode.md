@@ -2,14 +2,14 @@
 baseline_schema: "2.0"
 pack: "penguin-space"
 document: "sourcecode"
-status: "draft"
+status: "active"
 updated: "2026-08-10"
-code_ref: "uncommitted"
+code_ref: "worktree-m1"
 ---
 
-# Intended architecture
+# Architecture and M1 implementation
 
-No source code exists at this baseline. This document describes the **planned** topology drawn from the approved proposal; it is not code-inspected architecture.
+The M1 bootstrap is implemented in the worktree. `main.go` hosts the Wails application, `AppService` exposes typed bindings, `internal/core` owns the fixture lifecycle, and `internal/history` persists verified fixture outcomes. The broader provider, Docker/WSL, project-discovery, and elevation designs remain planned rather than implemented.
 
 ```mermaid
 flowchart LR
@@ -36,19 +36,19 @@ flowchart LR
 
 ## Build-environment boundary
 
-All project dependency installation, code generation, verification, tests, builds, and packaging are planned to execute inside Docker. The Windows host may run the editor, Git, Rancher Desktop/Docker, and `docker compose` only as the orchestrator; it must not provide a Go, Wails, Bun, Vue, or Windows packaging toolchain for PenguinSpace.
+All project dependency installation, code generation, verification, tests, builds, and packaging execute inside Docker. The Windows host may run the editor, Git, Rancher Desktop/Docker, and `docker compose` only as the orchestrator; it does not provide a Go, Wails, Bun, Vue, or Windows packaging toolchain for PenguinSpace.
 
 The frontend contract is Vue 3 + TypeScript + Vite, using pinned Bun `1.3.14` as the only JavaScript package manager and script runtime. The repository will commit `bun.lock` only; it will not introduce a Node/Corepack requirement or competing JavaScript lockfile. The initial frontend source must include `src/vite-env.d.ts`, with the `vite/client` reference and a `*.vue` module declaration, so the Bun-created Vue template type-checks reliably.
 
-The planned Compose contract has three responsibilities: `verify` for `bun install --frozen-lockfile` and static/test checks, `build` for `bun run build` followed by Windows packaging, and `shell` for disposable diagnostics. Toolchain and dependency caches belong to container-managed paths or Docker named volumes, never host SDK/cache bind mounts. A deliberately exported installer may use `out/` as a release artifact location.
+`Dockerfile` copies the pinned Bun binary into the pinned Go image and installs Wails CLI `v3.0.0-beta.6`. Compose provides `verify`, `build`, and `shell`; its Go module/build, Bun download, and frontend `node_modules` caches are named volumes. `verify` runs locked Bun installation, binding generation, Vue checks/build, Go internal vet/tests, and a Windows cross-compile. `build` runs Wails and writes `out/penguinspace.exe`. PowerShell delegates under `scripts/` call Compose only.
 
 ## Persistence and privilege boundaries
 
 Measurements are stored as exact `uint64` byte values with a separate provenance/value-kind field: measured, estimated, logical deletion, or physical reclamation. Formatting into IEC units is a presentation concern only.
 
-The planned persistence store is a schema-versioned SQLite database in the Windows per-user Local AppData known folder. It holds settings, plans, history, outcomes, and recovery records; diagnostics are separate rotated text files. The application must not open an untrusted database file as its own state.
+The implemented store uses pure-Go `modernc.org/sqlite` `v1.56.0`. It creates a SQLite database at `%LOCALAPPDATA%\\PenguinSpace\\penguinspace.db` on Windows, creates the initial `cleanup_history` table, and records SQLite `user_version = 1`. It currently persists fixture history only; settings, plans, outcomes, retention, and diagnostics remain M1 follow-on work. The application does not open an untrusted database file as its own state.
 
-The desktop process remains non-elevated. A privileged operation is represented by a validated, narrowly scoped plan passed to a separate helper launched via Windows UAC `runas`; the helper returns a structured result and cannot receive an arbitrary shell command.
+The desktop process remains non-elevated. A privileged operation is still a planned, validated, narrowly scoped plan passed to a separate helper launched via Windows UAC `runas`; that helper has not yet been implemented or runtime-verified.
 
 ## Provider lifecycle
 

@@ -1,0 +1,45 @@
+services:
+  verify:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: toolchain
+    image: penguinspace-toolchain:local
+    working_dir: /workspace
+    command: ["sh", "./scripts/in-container-verify.sh"]
+    volumes:
+      - .:/workspace
+      - go-module-cache:/go/pkg/mod
+      - go-build-cache:/root/.cache/go-build
+      - bun-download-cache:/root/.bun/install/cache
+      - frontend-node-modules:/workspace/frontend/node_modules
+
+  build:
+    image: penguinspace-toolchain:local
+    working_dir: /workspace
+    command: ["sh", "./scripts/in-container-build.sh"]
+    volumes:
+      - .:/workspace
+      - go-module-cache:/go/pkg/mod
+      - go-build-cache:/root/.cache/go-build
+      - bun-download-cache:/root/.bun/install/cache
+      - frontend-node-modules:/workspace/frontend/node_modules
+
+  shell:
+    image: penguinspace-toolchain:local
+    working_dir: /workspace
+    entrypoint: ["sh"]
+    stdin_open: true
+    tty: true
+    volumes:
+      - .:/workspace
+      - go-module-cache:/go/pkg/mod
+      - go-build-cache:/root/.cache/go-build
+      - bun-download-cache:/root/.bun/install/cache
+      - frontend-node-modules:/workspace/frontend/node_modules
+
+volumes:
+  go-module-cache:
+  go-build-cache:
+  bun-download-cache:
+  frontend-node-modules:

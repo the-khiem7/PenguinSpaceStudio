@@ -1,0 +1,22 @@
+{
+  "name": "penguinspace-frontend",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "packageManager": "bun@1.3.14",
+  "scripts": {
+    "dev": "vite",
+    "typecheck": "vue-tsc -b",
+    "build": "vue-tsc -b && vite build"
+  },
+  "dependencies": {
+    "@wailsio/runtime": "3.0.0-beta.5",
+    "vue": "3.5.41"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-vue": "6.0.8",
+    "typescript": "6.0.3",
+    "vite": "8.2.1",
+    "vue-tsc": "3.3.9"
+  }
+}

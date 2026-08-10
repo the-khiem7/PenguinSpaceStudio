@@ -1,0 +1,13 @@
+version: '3'
+
+info:
+  companyName: "PenguinSpace"
+  productName: "PenguinSpace"
+  productIdentifier: "io.github.the-khiem7.penguinspace"
+  description: "Windows-first developer storage manager"
+  copyright: "Copyright PenguinSpace contributors"
+  version: "0.1.0"
+
+dev_mode:
+  root_path: .
+  log_level: warn
