@@ -13,7 +13,7 @@ code_ref: "uncommitted"
 
 The following are approved and must not be re-litigated during implementation without explicit owner direction:
 
-- Wails 3, Go, Vue, Windows-first delivery.
+- Wails 3, Go, Vue 3 + TypeScript + Vite, Windows-first delivery.
 - Horizontal-first, WinUI 3-inspired Windows utility rather than a mobile-stretched SaaS dashboard or consumer scareware.
 - Complete Product Goal architecture delivered through milestones rather than a disposable MVP.
 - Provider/scanner-driven model; backend owns commands and tool semantics.
@@ -25,32 +25,54 @@ The following are approved and must not be re-litigated during implementation wi
 - Use tool-native cleanup when possible; do not silently install third-party cleaners or delete unknown filesystem paths.
 - Administrator elevation is per-operation, never the default launch mode.
 - PenguinSpace build, dependency installation, code generation, verification, tests, and packaging run inside Docker; the Windows host is only an editor, Git client, and Docker/Rancher orchestrator.
+- Bun `1.3.14` is the frontend package manager and script runtime inside the Docker toolchain. Node and Corepack are not part of the PenguinSpace M1 build environment; the repository will use a single `bun.lock` lockfile and no competing JavaScript package-manager lockfile.
+- Store every measurement as exact integer bytes; distinguish measured, estimated, logical-deletion, and physical-reclamation values; display IEC units with at most three significant digits.
+- Persist settings and cleanup/history records in a schema-versioned SQLite database under the Windows per-user Local AppData known folder; keep diagnostics as rotated text files beside it and never ingest an untrusted database file.
+- Discover project artifacts only below explicitly configured roots. Do not follow symbolic links/reparse points by default; record inaccessible paths rather than treating them as deletable.
+- Keep the main application non-elevated. Privileged operations will run in an isolated helper launched with the Windows `runas` verb, using a narrowly scoped plan/result contract.
+- Danger actions are never preselected and require an explicit consequence summary plus a deliberate confirmation step; ordinary Review confirmations are preference-controlled but cannot weaken Danger confirmation.
 
 ## Unverified external claims
 
 The following proposal guidance is product research, not runtime-confirmed implementation truth. Revalidate it against official documentation and installed versions before encoding it:
 
 - Exact cleanup commands and behaviour for uv, npm, pnpm, Yarn, Bun, Cypress, Playwright, NuGet, Cargo, Gradle, Maven, and Docker.
-- Current Wails 3 API, lifecycle, system-tray, window, packaging, and version-pinning behaviour.
+- Current Wails 3 API, lifecycle, system-tray, window, and packaging behaviour beyond the Phase 0 CLI/install and Windows cross-build research.
 - Windows and WSL/VHDX compaction requirements, privileges, supported paths, and recovery behaviour.
-- Compatible pinned versions and container feasibility for Go, Wails 3, Node.js, package manager, and Windows cross-build/packaging dependencies.
+- A real application build, Wails app/package result, and clean-host verification with the Phase 0 pinned Bun-first container toolchain.
 - Competitive product capabilities and differentiation statements.
 
 The preserved source contains the complete research command table and external links: [sources/PROPOSAL.md](sources/PROPOSAL.md#39-research-informed-command-guidance) and [sources/PROPOSAL.md](sources/PROPOSAL.md#40-external-documentation-references).
 
-## Implementation decisions still required
+## Phase 0 decision register
 
-| Topic | Assigned phase | Why it is open | Decision evidence required |
+The owner of every implementation task below is **Engineering**. `Closed` means the architecture or policy is settled; it is not runtime proof. `Deferred` means the scope, owner, risk, and target milestone are explicit.
+
+| Topic | Outcome and status | Evidence and chosen approach | Follow-on task |
 |---|---|---|---|
-| Supported tool versions | Phase 0 — Research and decision closure | CLI semantics can differ, especially Yarn and cache maintenance | Official docs plus tested versions |
-| Provider command/API detail | Phase 0 — Research and decision closure | Product direction intentionally avoids hard-coding stale commands | Structured output/API evidence and safe plan tests |
-| Size calculation and rounding | Phase 0 — Research and decision closure | Needed for credible estimates and history | Design decision and test fixtures |
-| Persistence format/location | Phase 0 — Research and decision closure | History, settings, diagnostics, and recovery need a durable model | Windows constraints, privacy decision, migration plan |
-| Exact elevation bridge | Phase 0 — Research and decision closure | Wails/Windows implementation detail | Tested UAC success/refusal/cancellation flows |
-| VHDX compaction strategy | Phase 0 — Research and decision closure | Safety and support vary by disk/environment | Windows documentation and real non-destructive trials |
-| Project-root discovery defaults | Phase 0 — Research and decision closure | Broad scans can be expensive or surprising | User-configurable scope and performance tests |
-| Confirmation language | Phase 0 — Research and decision closure | Danger needs deliberate informed consent | UX review and destructive-operation testing |
-| Docker build-image contract | Phase 0 — Research and decision closure | Container-only builds require an image capable of Windows packaging | Committed Dockerfile/Compose plus a clean-host Docker verification run |
+| Docker build-image contract | **Closed for M1 bootstrap.** Pin `golang:1.25-bookworm@sha256:908f8ff2ec296df2f349563072c7925775cd28b50361a52ed834a8a37399b9bf`, `oven/bun:1.3.14@sha256:e10577f0db68676a7024391c6e5cb4b879ebd17188ab750cf10024a6d700e5c4`, and Wails CLI `v3.0.0-beta.6`; never use `@latest` in the eventual Dockerfile. Vue 3 + TypeScript + Vite is built with Bun, using one `bun.lock`; Node/Corepack and their lockfiles are excluded from the M1 project toolchain. | Wails requires Go 1.25+ and documents Windows cross-build without CGO by default; Docker volumes are Docker-managed while bind mounts are host-coupled. Local disposable spike: Docker 29.5.3; Go 1.25.12; Wails beta.6 with `CGO_ENABLED=0`; Bun 1.3.14; and `bun x create-vite@9.1.2 --template vue-ts`, `bun install`, and `bun run build` passed (Vue 3.5.41, Vite 8.2.1). The Vite/Vue project needs a checked-in `src/vite-env.d.ts` declaration shim (`vite/client` reference plus `*.vue` module) before type-checking. [Wails install](https://v3.wails.io/quick-start/installation/), [Wails cross-build](https://v3.wails.io/guides/build/cross-platform/), [Bun Docker image](https://github.com/oven-sh/bun), [Bun Node compatibility](https://bun.sh/docs/runtime/nodejs-compat), [Docker volumes](https://docs.docker.com/engine/storage/volumes/), [bind mounts](https://docs.docker.com/engine/storage/bind-mounts/) | M1 creates and verifies a Dockerfile/Compose build image containing Go, Wails, and the pinned Bun binary; `verify` runs `bun install --frozen-lockfile` plus frontend checks, `build` runs `bun run build` before Wails packaging, and `shell` is disposable. A real Wails app/package and Windows package are still unverified. |
+| Supported tool versions | **Deferred — M2, non-blocking for M1.** Support is version-gated per provider, not inferred from command names. A provider supports only profiled versions listed in code and tests; unknown major versions may be detected but must not yield a cleanup plan. | CLI behavior is time-sensitive. This avoids a false global version promise before representative installations exist. | M2 adds a version matrix and fixture evidence with each provider implementation. |
+| Provider command/API detail | **Deferred — M2, non-blocking for M1.** The command catalogue below is an approved research baseline, not an executable batch script. | `npm cache verify` is inspection/repair; `pnpm store prune` removes only unreferenced entries; Cargo supports project-scoped `clean --dry-run`; Gradle provides its own cache lifecycle; NuGet, Cypress, and Playwright expose scoped cache operations. [npm](https://docs.npmjs.com/cli/cache/), [pnpm](https://pnpm.io/cli/store), [uv](https://docs.astral.sh/uv/concepts/cache/), [NuGet](https://learn.microsoft.com/en-us/dotnet/core/tools/dotnet-nuget-locals), [Cargo](https://doc.rust-lang.org/cargo/commands/cargo-clean.html), [Gradle](https://docs.gradle.org/current/userguide/directory_layout.html), [Cypress](https://docs.cypress.io/app/references/command-line), [Playwright](https://playwright.dev/docs/browsers), [Maven](https://maven.apache.org/components/plugins-archives/maven-dependency-plugin-3.8.1/purge-local-repository-mojo.html), [Yarn](https://yarnpkg.com/cli/cache/clean), [Bun](https://bun.sh/docs/pm/cli/pm) | M2 encodes one provider at a time: inspect first, then a reviewable plan and fixture tests. No bulk global cleanup is authorized. |
+| Size calculation and rounding | **Closed.** Backend values are `uint64` bytes and never rounded before persistence. UI uses IEC units (`KiB`, `MiB`, `GiB`, `TiB`) with at most three significant digits; byte values remain available in detail/export. | Exact bytes prevent sum/display drift; separate result fields preserve the proposal's logical-versus-physical distinction. | M1 defines models and format/rounding fixture tests. |
+| Persistence format/location | **Closed.** Use a schema-versioned SQLite database for settings, history, plans, outcomes, and recovery records below the Windows per-user Local AppData known folder; diagnostics are separate rotated text files. | SQLite provides a stable, single-file, transactional application format; Windows recommends known-folder APIs over deprecated CSIDL paths. [SQLite](https://www.sqlite.org/appfileformat.html), [Windows known folders](https://learn.microsoft.com/en-us/windows/win32/shell/known-folders) | M1 chooses the pure-Go SQLite driver, defines migrations, redaction, retention, and recovery tests. |
+| Exact elevation bridge | **Closed architecturally; runtime verification deferred to M1.** Use a separate least-privilege helper, invoked only for a planned operation through Windows `runas`; exchange only a validated plan and result, never an arbitrary shell command. | Windows documents `runas` as the UAC-elevated launch verb. This preserves normal non-elevated operation and narrows privilege scope. [ShellExecute](https://learn.microsoft.com/en-us/windows/win32/api/shellapi/nf-shellapi-shellexecutea) | M1 prototypes accepted, refused, cancelled, and malformed-plan flows on Windows. |
+| VHDX compaction strategy | **Deferred — M3, blocking only for VHDX execution.** Until a real Docker/WSL fixture exists, support discovery and an explanatory plan only; no compaction command is exposed. | `compact vdisk` applies only to dynamically expanding VHDs that are detached or read-only; `Optimize-VHD` may succeed without reducing file size. The local `.wslconfig` sets new WSL2 VHDs to 20GB, and Rancher Desktop currently has a running engine plus a stopped data distro. [compact vdisk](https://learn.microsoft.com/en-us/Windows-server/administration/windows-commands/compact-vdisk), [Optimize-VHD](https://learn.microsoft.com/en-us/powershell/module/hyper-v/optimize-vhd), [WSL config](https://learn.microsoft.com/windows/wsl/wsl-config) | M3 tests discovery, shutdown warning, UAC refusal, interruption, and measured physical size before/after against a disposable WSL/VHDX fixture. |
+| Project-root discovery defaults | **Closed.** Start with no implicit user-profile scan: users explicitly configure roots; the app may suggest detected Git/workspace roots only for approval. Reparse points are listed but not traversed. | This prevents broad, surprising, or cyclic scans while preserving a discoverable workflow. | M1 implements root configuration and traversal/error fixtures; M4 adds workspace discovery UX. |
+| Confirmation language | **Closed.** Every action states item, bytes, risk, recovery cost, consequence, and whether privilege/shutdown is required. Review uses a normal confirmation; Danger uses a separate deliberate confirmation that cannot be disabled. | Preserved proposal requires explicit consequences, no preselection, and deliberate confirmation for Danger. | M1 defines confirmation models and copy fixtures; M5 validates the visual/accessibility experience. |
+
+### Provider research boundary
+
+The following classifications guide later per-provider plans; they are not support claims until the M2 version matrix and fixtures exist.
+
+| Ecosystem | Research conclusion | Initial risk boundary |
+|---|---|---|
+| npm | Inspect with `npm cache verify`; clearing requires `npm cache clean --force`. | `verify`: Safe; clearing: Review. |
+| pnpm | `pnpm store prune` removes unreferenced packages and reports removed size. | Safe; recovery cost Download. |
+| Yarn / Bun | Yarn provides local/global cache scopes; Bun exposes global cache path/removal. | Review; never erase a project-local cache without its project context. |
+| uv / NuGet | Both offer official cache-specific clear commands. | Review; global packages/caches may cause later download or rebuild. |
+| Cargo | `cargo clean --dry-run` scopes inspection to a project target directory. Cargo-home layout is explicitly unstable. | Review for project artifacts; do not delete Cargo home by path. |
+| Gradle / Maven | Prefer Gradle's retention lifecycle; Maven purge is project/dependency scoped and may re-resolve unless configured. | Review; no blanket `.gradle` or `.m2` deletion. |
+| Cypress / Playwright | Cypress lists sizes and can prune old binaries; Playwright distinguishes this installation from `--all`. | Cypress prune: Safe; browser removal: Review; Playwright `--all`: Danger. |
 
 ## Evidence rules for future work
 

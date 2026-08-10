@@ -36,9 +36,19 @@ flowchart LR
 
 ## Build-environment boundary
 
-All project dependency installation, code generation, verification, tests, builds, and packaging are planned to execute inside Docker. The Windows host may run the editor, Git, Rancher Desktop/Docker, and `docker compose` only as the orchestrator; it must not provide a Go, Wails, Node/Vue, or Windows packaging toolchain for PenguinSpace.
+All project dependency installation, code generation, verification, tests, builds, and packaging are planned to execute inside Docker. The Windows host may run the editor, Git, Rancher Desktop/Docker, and `docker compose` only as the orchestrator; it must not provide a Go, Wails, Bun, Vue, or Windows packaging toolchain for PenguinSpace.
 
-The planned Compose contract has three responsibilities: `verify` for locked dependency installation and static/test checks, `build` for the Windows package, and `shell` for disposable diagnostics. Toolchain and dependency caches belong to container-managed paths or Docker named volumes, never host SDK/cache bind mounts. A deliberately exported installer may use `out/` as a release artifact location.
+The frontend contract is Vue 3 + TypeScript + Vite, using pinned Bun `1.3.14` as the only JavaScript package manager and script runtime. The repository will commit `bun.lock` only; it will not introduce a Node/Corepack requirement or competing JavaScript lockfile. The initial frontend source must include `src/vite-env.d.ts`, with the `vite/client` reference and a `*.vue` module declaration, so the Bun-created Vue template type-checks reliably.
+
+The planned Compose contract has three responsibilities: `verify` for `bun install --frozen-lockfile` and static/test checks, `build` for `bun run build` followed by Windows packaging, and `shell` for disposable diagnostics. Toolchain and dependency caches belong to container-managed paths or Docker named volumes, never host SDK/cache bind mounts. A deliberately exported installer may use `out/` as a release artifact location.
+
+## Persistence and privilege boundaries
+
+Measurements are stored as exact `uint64` byte values with a separate provenance/value-kind field: measured, estimated, logical deletion, or physical reclamation. Formatting into IEC units is a presentation concern only.
+
+The planned persistence store is a schema-versioned SQLite database in the Windows per-user Local AppData known folder. It holds settings, plans, history, outcomes, and recovery records; diagnostics are separate rotated text files. The application must not open an untrusted database file as its own state.
+
+The desktop process remains non-elevated. A privileged operation is represented by a validated, narrowly scoped plan passed to a separate helper launched via Windows UAC `runas`; the helper returns a structured result and cannot receive an arbitrary shell command.
 
 ## Provider lifecycle
 

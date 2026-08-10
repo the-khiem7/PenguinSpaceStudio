@@ -25,7 +25,8 @@ It is not a generic PC cleaner or merely a GUI for cache-clearing commands. Its 
 
 | Area | Decision | Status |
 |---|---|---|
-| Platform and stack | Windows desktop; Wails 3; Go backend; Vue frontend | Decided / locked |
+| Platform and stack | Windows desktop; Wails 3; Go backend; Vue 3 + TypeScript + Vite frontend | Decided / locked |
+| Frontend toolchain | Bun `1.3.14` runs dependency installation and frontend scripts inside Docker; Node/Corepack are not project build-toolchain dependencies | Decided / locked; Phase 0 container spike passed |
 | Delivery strategy | Build one complete Product Goal through milestones, not a disposable MVP architecture | Decided / locked |
 | Interaction design | Horizontal-first, WinUI 3-inspired, dense desktop utility with a left sidebar | Decided / locked |
 | Primary domains | Developer Tools, Containers & WSL, Projects, History, Settings | Decided / locked |

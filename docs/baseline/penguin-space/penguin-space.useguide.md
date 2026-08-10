@@ -37,7 +37,7 @@ Each cleanup row must show item/provider, current and estimated reclaimable size
 
 - Safe: disposable data, but state the recovery cost.
 - Review: source/state is retained but a rebuild or download is expected.
-- Danger: never preselected; visually distinct; selected only deliberately and confirmed with strengthened language.
+- Danger: never preselected; visually distinct; selected only deliberately and confirmed in a separate step that cannot be disabled by ordinary confirmation preferences.
 
 VHDX workflows must clearly explain the distinction between cleaning data inside the environment and shrinking physical Windows host allocation. UAC requirements must be announced at planning time.
 

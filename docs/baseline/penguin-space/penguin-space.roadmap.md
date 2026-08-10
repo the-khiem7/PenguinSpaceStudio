@@ -17,7 +17,7 @@ code_ref: "uncommitted"
 | Core adaptive pack | Complete | Introduction, roadmap, and decision/unknowns documents created |
 | Architecture and usage contract | Complete | Source-code and use-guide documents created because the proposal defines both materially |
 | Root proposal deletion | Complete | Root source removed after SHA-256 equality and pack-coverage verification |
-| Phase 0 — Research and decision closure | Not started | All nine implementation decisions are assigned here; no research result is yet accepted as product fact |
+| Phase 0 — Research and decision closure | Complete with scoped deferrals | Nine decisions were resolved or explicitly deferred in the Phase 0 register; Docker-only toolchain spike passed without a host SDK |
 | Product implementation | Not started / unverified | Repository has no commits or implementation files |
 
 ## Phase 0 — Research and decision closure
@@ -31,6 +31,8 @@ Close the following decisions with an evidence record for each: pinned container
 **Acceptance criteria:** every current open decision is either closed with the required evidence or explicitly deferred with owner, reason, risk, and a blocking/non-blocking designation. The list in [penguin-space.hallucination.md](penguin-space.hallucination.md) is synchronized so it contains only genuinely open items.
 
 **Verification gate:** no implementation milestone begins on an unverified assumption that Phase 0 identifies as blocking. A research note, a successful image build, or a static check alone is not sufficient evidence for a closed runtime decision.
+
+**Completion record (2026-08-10):** the decision register is in [penguin-space.hallucination.md](penguin-space.hallucination.md#phase-0-decision-register). Docker Engine 29.5.3 was available through Rancher Desktop; disposable containers successfully ran Go `1.25.12`, Wails CLI `v3.0.0-beta.6` with `CGO_ENABLED=0`, and Bun `1.3.14`. Bun created a Vue 3 + TypeScript + Vite project and completed `vue-tsc -b && vite build` alongside the Go/Wails CLI checks. The generated project required an explicit `src/vite-env.d.ts` Vite/Vue declaration shim; M1 must create and retain that source file. An earlier Node/npm/Corepack probe is superseded and is not the M1 project build stack. The tested base-image digests are recorded in that register. The probe did not create an application, Dockerfile, Compose manifest, Wails app package, or Windows package; those remain Milestone 1 work.
 
 ## Milestone 1 — Core platform
 
@@ -46,7 +48,7 @@ Close the following decisions with an evidence record for each: pinned container
 
 **Acceptance criteria:** the app can scan a test provider through the full scan → plan → confirm → execute → verify pipeline without frontend-owned shell commands; results expose risk, recovery cost, estimates, status, and actual reclaimed bytes where measurable.
 
-**Verification gate:** a clean Windows host, without PenguinSpace Go/Wails/Node/Windows build SDK toolchains, can run the containerized verification path; then provider and plan tests plus an end-to-end Windows run. A build alone is insufficient.
+**Verification gate:** a clean Windows host, without PenguinSpace Go/Wails/Bun/Windows build SDK toolchains, can run the containerized verification path; then provider and plan tests plus an end-to-end Windows run. A build alone is insufficient.
 
 ## Milestone 2 — Developer tool ecosystems
 
@@ -111,7 +113,7 @@ Cover failure recovery, locked files, permission failures, malformed output, par
 
 ## Exact next action
 
-Start Phase 0 by creating the decision register and resolving the Docker build-image contract through a non-destructive container spike; record the result before creating the Wails 3/Go/Vue application shell.
+Create the Dockerfile and Compose manifest using the Phase 0 pinned Bun-first toolchain decision, then implement container-only `verify`, `build`, and `shell` scripts before creating the Wails 3/Go/Vue application shell and one fixture-backed provider-contract vertical slice. It must produce a reviewable cleanup plan but perform no destructive cleanup.
 
 ## Pack migration verification
 
