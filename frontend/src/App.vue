@@ -1,12 +1,14 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from "vue";
-import { backend, type Scenario } from "./backend";
+import { computed, onBeforeUnmount, onMounted, ref } from "vue";
+import { backend, type ElevationStatus, type Scenario } from "./backend";
 
 const stage = ref("Connecting to the local service…");
 const safetyMessage = ref("All cleanup requires a reviewed plan.");
 const scenario = ref<Scenario | null>(null);
 const error = ref("");
 const running = ref(false);
+const elevation = ref<ElevationStatus | null>(null);
+let elevationPoller: ReturnType<typeof setInterval> | undefined;
 
 const reclaimed = computed(() => scenario.value?.verification.reclaimedActual.bytes ?? 0);
 const formattedReclaimed = computed(() => `${(reclaimed.value / 1024 / 1024).toFixed(2)} MiB`);
@@ -19,6 +21,15 @@ onMounted(async () => {
   } catch (cause) {
     error.value = `Backend connection failed: ${String(cause)}`;
   }
+
+  elevationPoller = setInterval(async () => {
+    const status = await backend.elevationStatus();
+    if (status.id) elevation.value = status;
+  }, 500);
+});
+
+onBeforeUnmount(() => {
+  if (elevationPoller) clearInterval(elevationPoller);
 });
 
 async function runFixture() {
@@ -30,6 +41,24 @@ async function runFixture() {
     error.value = `Fixture scenario failed: ${String(cause)}`;
   } finally {
     running.value = false;
+  }
+}
+
+async function startElevationProbe() {
+  error.value = "";
+  try {
+    elevation.value = await backend.startElevationProbe();
+  } catch (cause) {
+    error.value = `Elevation probe failed to start: ${String(cause)}`;
+  }
+}
+
+async function cancelElevationProbe() {
+  error.value = "";
+  try {
+    elevation.value = await backend.cancelElevationProbe();
+  } catch (cause) {
+    error.value = `Elevation probe cancellation failed: ${String(cause)}`;
   }
 }
 </script>
@@ -95,6 +124,16 @@ async function runFixture() {
             <li>The M1 fixture mutates memory only.</li>
             <li>SQLite records verified outcomes locally.</li>
           </ul>
+          <div class="elevation-probe">
+            <p class="eyebrow">Windows UAC probe</p>
+            <p class="muted">This starts an elevated helper that only validates a fixed, no-op action. It cannot run a shell command or cleanup provider.</p>
+            <p class="probe-state">{{ elevation?.state ?? "not started" }}</p>
+            <p v-if="elevation" class="muted">{{ elevation.message }}</p>
+            <div class="probe-actions">
+              <button :disabled="elevation?.state === 'awaiting-consent' || elevation?.state === 'running' || elevation?.state === 'queued'" @click="startElevationProbe">Test Windows consent</button>
+              <button class="secondary" :disabled="!elevation || ['succeeded', 'failed', 'cancelled', 'timed-out'].includes(elevation.state)" @click="cancelElevationProbe">Cancel probe</button>
+            </div>
+          </div>
         </aside>
       </section>
     </section>

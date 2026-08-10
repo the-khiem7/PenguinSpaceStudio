@@ -7,8 +7,19 @@ export type Scenario = {
   verification: { reclaimedActual: { bytes: number } };
 };
 
+export type ElevationStatus = {
+  id: string;
+  actionId: string;
+  state: string;
+  message: string;
+  updatedAt: string;
+};
+
 export const backend = {
   dashboard: () => AppService.Dashboard(),
   runFixtureScenario: (): Promise<Scenario> => AppService.RunFixtureScenario() as Promise<Scenario>,
+  startElevationProbe: (): Promise<ElevationStatus> => AppService.StartElevationProbe() as Promise<ElevationStatus>,
+  cancelElevationProbe: (): Promise<ElevationStatus> => AppService.CancelElevationProbe() as Promise<ElevationStatus>,
+  elevationStatus: (): Promise<ElevationStatus> => AppService.ElevationStatus() as Promise<ElevationStatus>,
   recentHistory: () => AppService.RecentHistory(),
 };

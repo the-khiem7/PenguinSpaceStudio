@@ -4,12 +4,14 @@ pack: "penguin-space"
 document: "useguide"
 status: "draft"
 updated: "2026-08-10"
-code_ref: "5ba3fe8"
+code_ref: "worktree-m1-elevation-after-e3f7522"
 ---
 
 # Intended product interaction contract
 
-This is the Product Goal interaction contract. M1 now implements its left-navigation shell and a visible fixture lifecycle panel; all other pages and real cleanup workflows remain planned.
+This is the Product Goal interaction contract. M1 now implements its left-navigation shell, a visible fixture lifecycle panel, and an unverified Windows UAC probe panel; all other pages and real cleanup workflows remain planned.
+
+The UAC panel's **Test Windows consent** action is a fixed no-op probe, not a cleanup request. It shows queued, consent, running, cancellation, success, failure, and timeout states. It is not acceptance-tested on an interactive Windows desktop yet.
 
 ## Navigation and layout
 

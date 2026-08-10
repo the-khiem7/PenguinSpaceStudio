@@ -6,7 +6,7 @@ FROM golang:1.25-bookworm@sha256:908f8ff2ec296df2f349563072c7925775cd28b50361a52
 
 COPY --from=bun /usr/local/bin/bun /usr/local/bin/bun
 
-ENV PATH="/usr/local/go/bin:/usr/local/bin:/go/bin:${PATH}" \
+ENV PATH="/usr/local/go/bin:/usr/local/bin:/go/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin" \
     GOBIN="/usr/local/bin" \
     GOMODCACHE="/go/pkg/mod" \
     GOCACHE="/root/.cache/go-build" \

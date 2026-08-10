@@ -3,6 +3,7 @@ package main
 import (
 	"embed"
 	"log"
+	"os"
 
 	"github.com/wailsapp/wails/v3/pkg/application"
 )
@@ -11,6 +12,13 @@ import (
 var assets embed.FS
 
 func main() {
+	if handled, err := runElevatedHelper(os.Args[1:]); handled {
+		if err != nil {
+			log.Print(err)
+		}
+		return
+	}
+
 	service, err := NewAppService()
 	if err != nil {
 		log.Fatal(err)

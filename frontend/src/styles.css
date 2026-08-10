@@ -41,5 +41,9 @@ button:disabled { opacity: .55; cursor: wait; }
 .lifecycle small { color: #8493aa; line-height: 1.35; }
 .safety-panel { background: #182b31; border-color: #31515b; }
 .safety-panel ul { padding-left: 20px; color: #c0cedc; line-height: 1.6; }
+.elevation-probe { margin-top: 24px; padding-top: 20px; border-top: 1px solid #31515b; }
+.probe-state { margin: 12px 0 5px; color: #f4f7fb; font-weight: 700; text-transform: capitalize; }
+.probe-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 14px; }
+.secondary { background: #2c3648; color: #e8edf7; }
 .error { margin: 20px 0 0; color: #ffb4ab; }
 @media (max-width: 1100px) { .workspace { grid-template-columns: 1fr; } .lifecycle { grid-template-columns: repeat(3, 1fr); } }
