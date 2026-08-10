@@ -55,8 +55,8 @@ func (s *AppService) RecentHistory() ([]core.HistoryRecord, error) {
 	return s.history.List(context.Background(), 20)
 }
 
-func (s *AppService) StartElevationProbe() (elevation.OperationStatus, error) {
-	return s.elevation.StartM1Probe()
+func (s *AppService) StartElevationProbe(mode elevation.ProbeMode) (elevation.OperationStatus, error) {
+	return s.elevation.StartM1Probe(mode)
 }
 
 func (s *AppService) CancelElevationProbe() (elevation.OperationStatus, error) {

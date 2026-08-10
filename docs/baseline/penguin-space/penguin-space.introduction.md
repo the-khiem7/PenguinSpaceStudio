@@ -4,7 +4,7 @@ pack: "penguin-space"
 document: "introduction"
 status: "active"
 updated: "2026-08-11"
-code_ref: "6ee788d"
+code_ref: "uncommitted worktree atop 152f5e1"
 ---
 
 # PenguinSpace baseline
@@ -43,7 +43,7 @@ It is not a generic PC cleaner or merely a GUI for cache-clearing commands. Its 
 - The product decisions recorded in this pack are approved direction, not proof that a provider, UI, command, integration, cleanup, or VHDX operation currently works.
 - Docker-only verification and Windows cross-build pass through Compose. The generated Windows executable launched successfully for five seconds on the host in a hidden smoke test, then was stopped; this is process-start evidence, not interactive UI acceptance.
 - The fixture lifecycle scans, plans, requires confirmation, executes only an in-memory change, verifies exact reclaimed bytes, and persists a history record. It is not an implementation of any real cleanup provider or command.
-- Real provider integrations, UAC refusal, cancellation, timeout, package/installer creation, and full interactive UI QA remain unverified. The observed UI reports a duplicate-start request as `already in progress`; this is backend-safe but needs a frontend pending-state fix before the remaining interactive tests.
+- The uncommitted M1 continuation adds three allow-listed no-op probe modes: immediate UAC consent, cancellable delay, and forced timeout. Vue disables every start action immediately while the request is in flight and consumes the generated Wails `ProbeMode` enum rather than duplicating string values. Docker `verify` passed after this change and Docker `build` produced `out/penguinspace.exe` (13,545,984 bytes). The new executable's interactive UAC cases remain unverified.
 - Commands and external-documentation behaviour are time-sensitive and must be verified against current official sources before a provider is implemented.
 
 ## Storage model

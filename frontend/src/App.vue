@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref } from "vue";
-import { backend, type ElevationStatus, type Scenario } from "./backend";
+import { backend, ElevationProbeMode, type ElevationStatus, type Scenario } from "./backend";
 
 const stage = ref("Connecting to the local service…");
 const safetyMessage = ref("All cleanup requires a reviewed plan.");
@@ -8,10 +8,15 @@ const scenario = ref<Scenario | null>(null);
 const error = ref("");
 const running = ref(false);
 const elevation = ref<ElevationStatus | null>(null);
+const elevationStarting = ref(false);
 let elevationPoller: ReturnType<typeof setInterval> | undefined;
 
 const reclaimed = computed(() => scenario.value?.verification.reclaimedActual.bytes ?? 0);
 const formattedReclaimed = computed(() => `${(reclaimed.value / 1024 / 1024).toFixed(2)} MiB`);
+const elevationBusy = computed(() =>
+  elevationStarting.value ||
+  (elevation.value !== null && !["succeeded", "failed", "cancelled", "timed-out"].includes(elevation.value.state)),
+);
 
 onMounted(async () => {
   try {
@@ -44,12 +49,16 @@ async function runFixture() {
   }
 }
 
-async function startElevationProbe() {
+async function startElevationProbe(mode: ElevationProbeMode) {
+  if (elevationBusy.value) return;
+  elevationStarting.value = true;
   error.value = "";
   try {
-    elevation.value = await backend.startElevationProbe();
+    elevation.value = await backend.startElevationProbe(mode);
   } catch (cause) {
     error.value = `Elevation probe failed to start: ${String(cause)}`;
+  } finally {
+    elevationStarting.value = false;
   }
 }
 
@@ -127,11 +136,14 @@ async function cancelElevationProbe() {
           <div class="elevation-probe">
             <p class="eyebrow">Windows UAC probe</p>
             <p class="muted">This starts an elevated helper that only validates a fixed, no-op action. It cannot run a shell command or cleanup provider.</p>
+            <p class="muted">For cancellation, approve UAC and then select Cancel probe. The timeout test waits for its fixed deadline.</p>
             <p class="probe-state">{{ elevation?.state ?? "not started" }}</p>
             <p v-if="elevation" class="muted">{{ elevation.message }}</p>
             <div class="probe-actions">
-              <button :disabled="elevation?.state === 'awaiting-consent' || elevation?.state === 'running' || elevation?.state === 'queued'" @click="startElevationProbe">Test Windows consent</button>
-              <button class="secondary" :disabled="!elevation || ['succeeded', 'failed', 'cancelled', 'timed-out'].includes(elevation.state)" @click="cancelElevationProbe">Cancel probe</button>
+              <button :disabled="elevationBusy" @click="startElevationProbe(ElevationProbeMode.ProbeModeConsent)">Test Windows consent</button>
+              <button class="secondary" :disabled="elevationBusy" @click="startElevationProbe(ElevationProbeMode.ProbeModeCancellation)">Test cancellation</button>
+              <button class="secondary" :disabled="elevationBusy" @click="startElevationProbe(ElevationProbeMode.ProbeModeTimeout)">Test timeout</button>
+              <button class="secondary" :disabled="!elevationBusy || elevationStarting" @click="cancelElevationProbe">Cancel probe</button>
             </div>
           </div>
         </aside>

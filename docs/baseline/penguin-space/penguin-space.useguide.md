@@ -4,14 +4,14 @@ pack: "penguin-space"
 document: "useguide"
 status: "draft"
 updated: "2026-08-11"
-code_ref: "6ee788d"
+code_ref: "uncommitted worktree atop 152f5e1"
 ---
 
 # Intended product interaction contract
 
 This is the Product Goal interaction contract. M1 now implements its left-navigation shell, a visible fixture lifecycle panel, and a partially runtime-verified Windows UAC probe panel; all other pages and real cleanup workflows remain planned.
 
-The UAC panel's **Test Windows consent** action is a fixed no-op probe, not a cleanup request. On 2026-08-11, the user observed it reach `Succeeded` in the interactive Windows shell. A second start while the first request is still active is safely rejected, but presently presents a stale error; the UI must disable Start immediately. Cancellation and timeout need controlled safe probe modes before they can be manually exercised.
+The UAC panel's **Test Windows consent** action is a fixed no-op probe, not a cleanup request. On 2026-08-11, the user observed it reach `Succeeded` in the interactive Windows shell. The current worktree disables every start action immediately while a start is pending or an operation is active, so a second click cannot surface the previous stale `already in progress` error. **Test cancellation** starts a delayed no-op after UAC approval; select **Cancel probe** while it is active. **Test timeout** has a fixed safe delay equal to the fixed operation window and should end as `timed-out`. These controls still cannot invoke a cleanup provider or shell command. Their Windows runtime outcomes remain unverified.
 
 ## Navigation and layout
 

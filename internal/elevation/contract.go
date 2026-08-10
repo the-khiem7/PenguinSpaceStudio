@@ -14,6 +14,14 @@ const (
 	maxProbeDelay          = 30 * time.Second
 )
 
+type ProbeMode string
+
+const (
+	ProbeModeConsent      ProbeMode = "consent"
+	ProbeModeCancellation ProbeMode = "cancellation-test"
+	ProbeModeTimeout      ProbeMode = "timeout-test"
+)
+
 type State string
 
 const (
@@ -35,6 +43,7 @@ type Request struct {
 	Version          int       `json:"version"`
 	ID               string    `json:"id"`
 	ActionID         string    `json:"actionId"`
+	ProbeMode        ProbeMode `json:"probeMode"`
 	ExpiresAt        time.Time `json:"expiresAt"`
 	ProbeDelayMillis int       `json:"probeDelayMillis"`
 }
@@ -47,9 +56,13 @@ type OperationStatus struct {
 	UpdatedAt time.Time `json:"updatedAt"`
 }
 
-func NewRequest(now time.Time, timeout time.Duration) (Request, error) {
+func NewRequest(now time.Time, timeout time.Duration, mode ProbeMode) (Request, error) {
 	if timeout <= 0 || timeout > maxProbeDelay {
 		return Request{}, fmt.Errorf("elevation timeout must be between 1ms and %s", maxProbeDelay)
+	}
+	delay, err := probeDelay(mode, timeout)
+	if err != nil {
+		return Request{}, err
 	}
 
 	identifier := make([]byte, 16)
@@ -58,10 +71,12 @@ func NewRequest(now time.Time, timeout time.Duration) (Request, error) {
 	}
 
 	return Request{
-		Version:   contractVersion,
-		ID:        hex.EncodeToString(identifier),
-		ActionID:  ActionM1ElevationProbe,
-		ExpiresAt: now.UTC().Add(timeout),
+		Version:          contractVersion,
+		ID:               hex.EncodeToString(identifier),
+		ActionID:         ActionM1ElevationProbe,
+		ProbeMode:        mode,
+		ExpiresAt:        now.UTC().Add(timeout),
+		ProbeDelayMillis: int(delay / time.Millisecond),
 	}, nil
 }
 
@@ -78,6 +93,9 @@ func (r Request) Validate(now time.Time) error {
 	if r.ActionID != ActionM1ElevationProbe {
 		return errors.New("elevation action is not allow-listed")
 	}
+	if !r.ProbeMode.valid() {
+		return errors.New("elevation probe mode is not allow-listed")
+	}
 	if r.ProbeDelayMillis < 0 || time.Duration(r.ProbeDelayMillis)*time.Millisecond > maxProbeDelay {
 		return errors.New("invalid elevation probe delay")
 	}
@@ -85,4 +103,21 @@ func (r Request) Validate(now time.Time) error {
 		return errors.New("elevation request has expired")
 	}
 	return nil
+}
+
+func (m ProbeMode) valid() bool {
+	return m == ProbeModeConsent || m == ProbeModeCancellation || m == ProbeModeTimeout
+}
+
+func probeDelay(mode ProbeMode, timeout time.Duration) (time.Duration, error) {
+	switch mode {
+	case ProbeModeConsent:
+		return 0, nil
+	case ProbeModeCancellation:
+		return timeout / 2, nil
+	case ProbeModeTimeout:
+		return timeout, nil
+	default:
+		return 0, errors.New("elevation probe mode is not allow-listed")
+	}
 }

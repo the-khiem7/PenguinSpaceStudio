@@ -29,14 +29,14 @@ func NewController(store Store, launcher Launcher, timeout time.Duration) *Contr
 	return &Controller{store: store, launcher: launcher, timeout: timeout, poll: 50 * time.Millisecond}
 }
 
-func (c *Controller) StartM1Probe() (OperationStatus, error) {
+func (c *Controller) StartM1Probe(mode ProbeMode) (OperationStatus, error) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	if !c.current.State.Terminal() && c.current.ID != "" {
 		return OperationStatus{}, errors.New("an elevation operation is already in progress")
 	}
 
-	request, err := NewRequest(time.Now().UTC(), c.timeout)
+	request, err := NewRequest(time.Now().UTC(), c.timeout, mode)
 	if err != nil {
 		return OperationStatus{}, err
 	}

@@ -4,14 +4,14 @@ pack: "penguin-space"
 document: "sourcecode"
 status: "active"
 updated: "2026-08-11"
-code_ref: "6ee788d"
+code_ref: "uncommitted worktree atop 152f5e1"
 ---
 
 # Architecture and M1 implementation
 
 The M1 bootstrap is implemented in commit `5ba3fe8`. `main.go` hosts the Wails application, `AppService` exposes typed bindings, `internal/core` owns the fixture lifecycle, and `internal/history` persists verified fixture outcomes. The broader provider, Docker/WSL, and project-discovery designs remain planned rather than implemented; the limited elevation prototype is described below.
 
-The M1 elevation continuation is implemented in `6ee788d`. `internal/elevation` owns a fixed `m1.elevation.probe` request contract, persistence, helper execution, and a status controller. `elevation_launcher_windows.go` launches the current executable through the Windows `runas` verb; `elevated_helper.go` accepts only `--elevated-helper --elevation-request-id <opaque-id>`, then loads and validates the stored request. The only allow-listed action is a no-op probe. A cancellation marker and expiry result in `cancelled` or `timed-out`; no provider command, cleanup path, or arbitrary process is represented in the contract. Docker verification and Windows cross-build passed, and the user observed the visible probe finish as `Succeeded`; refusal, cancellation, timeout, and duplicate-start UI feedback remain to be verified or improved.
+The M1 elevation continuation is implemented in `6ee788d`, with an uncommitted follow-up atop `152f5e1`. `internal/elevation` owns a fixed `m1.elevation.probe` request contract, persistence, helper execution, and a status controller. `elevation_launcher_windows.go` launches the current executable through the Windows `runas` verb; `elevated_helper.go` accepts only `--elevated-helper --elevation-request-id <opaque-id>`, then loads and validates the stored request. The only allow-listed action is a no-op probe. The follow-up exposes exactly three modes: `consent` has no delay, `cancellation-test` waits for half of the fixed operation window, and `timeout-test` waits until that fixed window expires. The UI passes Wails-generated `ProbeMode` enum values, sets a local pending state before the asynchronous start returns, and disables competing starts. A cancellation marker and expiry result in `cancelled` or `timed-out`; no provider command, cleanup path, or arbitrary process is represented in the contract. Docker verification and build passed, producing `out/penguinspace.exe` (13,545,984 bytes). UAC refusal, cancellation, timeout, and final visible-shell acceptance remain unverified.
 
 ```mermaid
 flowchart LR
@@ -50,7 +50,7 @@ Measurements are stored as exact `uint64` byte values with a separate provenance
 
 The implemented store uses pure-Go `modernc.org/sqlite` `v1.56.0`. It creates a SQLite database at `%LOCALAPPDATA%\\PenguinSpace\\penguinspace.db` on Windows, creates the initial `cleanup_history` table, and records SQLite `user_version = 1`. It currently persists fixture history only; settings, plans, outcomes, retention, and diagnostics remain M1 follow-on work. The application does not open an untrusted database file as its own state.
 
-The desktop process remains non-elevated. A privileged operation is still a planned, validated, narrowly scoped plan passed to a separate helper launched via Windows UAC `runas`; that helper has not yet been implemented or runtime-verified.
+The desktop process remains non-elevated. The implemented helper is limited to the M1 no-op probe and is partially runtime-verified. A privileged operation for a real provider remains planned: it must be a validated, narrowly scoped plan passed to a separate UAC `runas` helper and must not reuse this test-only probe contract.
 
 ## Provider lifecycle
 
