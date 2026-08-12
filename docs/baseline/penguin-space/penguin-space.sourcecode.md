@@ -3,15 +3,17 @@ baseline_schema: "2.0"
 pack: "penguin-space"
 document: "sourcecode"
 status: "active"
-updated: "2026-08-11"
-code_ref: "uncommitted worktree atop 152f5e1"
+updated: "2026-08-12"
+code_ref: "8fc559a"
 ---
 
 # Architecture and M1 implementation
 
 The M1 bootstrap is implemented in commit `5ba3fe8`. `main.go` hosts the Wails application, `AppService` exposes typed bindings, `internal/core` owns the fixture lifecycle, and `internal/history` persists verified fixture outcomes. The broader provider, Docker/WSL, and project-discovery designs remain planned rather than implemented; the limited elevation prototype is described below.
 
-The M1 elevation continuation is implemented in `6ee788d`, with an uncommitted follow-up atop `152f5e1`. `internal/elevation` owns a fixed `m1.elevation.probe` request contract, persistence, helper execution, and a status controller. `elevation_launcher_windows.go` launches the current executable through the Windows `runas` verb; `elevated_helper.go` accepts only `--elevated-helper --elevation-request-id <opaque-id>`, then loads and validates the stored request. The only allow-listed action is a no-op probe. The follow-up exposes exactly three modes: `consent` has no delay, `cancellation-test` waits for half of the fixed operation window, and `timeout-test` waits until that fixed window expires. The UI passes Wails-generated `ProbeMode` enum values, sets a local pending state before the asynchronous start returns, and disables competing starts. A cancellation marker and expiry result in `cancelled` or `timed-out`; no provider command, cleanup path, or arbitrary process is represented in the contract. Docker verification and build passed, producing `out/penguinspace.exe` (13,545,984 bytes). UAC refusal, cancellation, timeout, and final visible-shell acceptance remain unverified.
+The M1 elevation continuation is implemented in `6ee788d`, with the controlled interaction follow-up committed as `8fc559a`. `internal/elevation` owns a fixed `m1.elevation.probe` request contract, persistence, helper execution, and a status controller. `elevation_launcher_windows.go` launches the current executable through the Windows `runas` verb; `elevated_helper.go` accepts only `--elevated-helper --elevation-request-id <opaque-id>`, then loads and validates the stored request. The only allow-listed action is a no-op probe. The follow-up exposes exactly three modes: `consent` has no delay, `cancellation-test` waits for half of the fixed operation window, and `timeout-test` waits until that fixed window expires. The UI passes Wails-generated `ProbeMode` enum values, sets a local pending state before the asynchronous start returns, and disables competing starts. A cancellation marker and expiry result in `cancelled` or `timed-out`; no provider command, cleanup path, or arbitrary process is represented in the contract. Docker verification and build passed, producing `out/penguinspace.exe` (13,545,984 bytes). UAC refusal, cancellation, timeout, and final visible-shell acceptance remain unverified.
+
+The current timing boundary is not yet acceptance-safe for a slow operator. `NewRequest` calculates `ExpiresAt` before `Controller.run` invokes the synchronous Windows launcher. `Controller.run` starts its timer after `Launch` returns, but that timer targets the earlier absolute expiry. Therefore time spent on the secure UAC desktop reduces or can exhaust the helper execution window. The next implementation must begin the bounded execution deadline only after consent succeeds, while preserving a distinct non-destructive outcome for explicit UAC refusal.
 
 ```mermaid
 flowchart LR

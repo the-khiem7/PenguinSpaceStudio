@@ -3,8 +3,8 @@ baseline_schema: "2.0"
 pack: "penguin-space"
 document: "introduction"
 status: "active"
-updated: "2026-08-11"
-code_ref: "uncommitted worktree atop 152f5e1"
+updated: "2026-08-12"
+code_ref: "8fc559a"
 ---
 
 # PenguinSpace baseline
@@ -43,7 +43,7 @@ It is not a generic PC cleaner or merely a GUI for cache-clearing commands. Its 
 - The product decisions recorded in this pack are approved direction, not proof that a provider, UI, command, integration, cleanup, or VHDX operation currently works.
 - Docker-only verification and Windows cross-build pass through Compose. The generated Windows executable launched successfully for five seconds on the host in a hidden smoke test, then was stopped; this is process-start evidence, not interactive UI acceptance.
 - The fixture lifecycle scans, plans, requires confirmation, executes only an in-memory change, verifies exact reclaimed bytes, and persists a history record. It is not an implementation of any real cleanup provider or command.
-- The uncommitted M1 continuation adds three allow-listed no-op probe modes: immediate UAC consent, cancellable delay, and forced timeout. Vue disables every start action immediately while the request is in flight and consumes the generated Wails `ProbeMode` enum rather than duplicating string values. Docker `verify` passed after this change and Docker `build` produced `out/penguinspace.exe` (13,545,984 bytes). The new executable's interactive UAC cases remain unverified.
+- Commit `8fc559a` adds three allow-listed no-op probe modes: immediate UAC consent, cancellable delay, and forced timeout. Vue disables every start action immediately while the request is in flight and consumes the generated Wails `ProbeMode` enum rather than duplicating string values. Docker `verify` passed after this change and Docker `build` produced `out/penguinspace.exe` (13,545,984 bytes). The new executable's interactive UAC cases remain unverified. The request expiry is currently calculated before Windows consent completes, so a slow operator response can consume the 30-second execution window; correct that timing boundary before acceptance.
 - Commands and external-documentation behaviour are time-sensitive and must be verified against current official sources before a provider is implemented.
 
 ## Storage model

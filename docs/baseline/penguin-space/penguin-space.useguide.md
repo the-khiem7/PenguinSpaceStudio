@@ -3,15 +3,17 @@ baseline_schema: "2.0"
 pack: "penguin-space"
 document: "useguide"
 status: "draft"
-updated: "2026-08-11"
-code_ref: "uncommitted worktree atop 152f5e1"
+updated: "2026-08-12"
+code_ref: "8fc559a"
 ---
 
 # Intended product interaction contract
 
 This is the Product Goal interaction contract. M1 now implements its left-navigation shell, a visible fixture lifecycle panel, and a partially runtime-verified Windows UAC probe panel; all other pages and real cleanup workflows remain planned.
 
-The UAC panel's **Test Windows consent** action is a fixed no-op probe, not a cleanup request. On 2026-08-11, the user observed it reach `Succeeded` in the interactive Windows shell. The current worktree disables every start action immediately while a start is pending or an operation is active, so a second click cannot surface the previous stale `already in progress` error. **Test cancellation** starts a delayed no-op after UAC approval; select **Cancel probe** while it is active. **Test timeout** has a fixed safe delay equal to the fixed operation window and should end as `timed-out`. These controls still cannot invoke a cleanup provider or shell command. Their Windows runtime outcomes remain unverified.
+The UAC panel's **Test Windows consent** action is a fixed no-op probe, not a cleanup request. On 2026-08-11, the user observed it reach `Succeeded` in the interactive Windows shell. Commit `8fc559a` disables every start action immediately while a start is pending or an operation is active, so a second click cannot surface the previous stale `already in progress` error. **Test cancellation** starts a delayed no-op after UAC approval; select **Cancel probe** while it is active. **Test timeout** has a fixed safe delay equal to the fixed operation window and should end as `timed-out`. These controls still cannot invoke a cleanup provider or shell command. Their Windows runtime outcomes remain unverified.
+
+During acceptance, automation may open the application and operate its normal window, but the operator may need to answer the secure UAC prompt manually. The acceptance runner must wait for the operator and must not cancel merely because the response takes time. The current build does not yet meet that interaction contract because its request expiry begins before UAC consent completes; rebuild after correcting that boundary before collecting refusal, cancellation, or timeout evidence.
 
 ## Navigation and layout
 
