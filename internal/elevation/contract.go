@@ -10,8 +10,10 @@ import (
 
 const (
 	ActionM1ElevationProbe = "m1.elevation.probe"
-	contractVersion        = 1
-	maxProbeDelay          = 30 * time.Second
+	contractVersion        = 2
+	maxExecutionTimeout    = 30 * time.Second
+	timeoutProbeOverrun    = 250 * time.Millisecond
+	maxProbeDelay          = maxExecutionTimeout + timeoutProbeOverrun
 )
 
 type ProbeMode string
@@ -40,12 +42,15 @@ func (s State) Terminal() bool {
 }
 
 type Request struct {
-	Version          int       `json:"version"`
-	ID               string    `json:"id"`
-	ActionID         string    `json:"actionId"`
-	ProbeMode        ProbeMode `json:"probeMode"`
-	ExpiresAt        time.Time `json:"expiresAt"`
-	ProbeDelayMillis int       `json:"probeDelayMillis"`
+	Version                int        `json:"version"`
+	ID                     string     `json:"id"`
+	ActionID               string     `json:"actionId"`
+	ProbeMode              ProbeMode  `json:"probeMode"`
+	CreatedAt              time.Time  `json:"createdAt"`
+	ExecutionTimeoutMillis int        `json:"executionTimeoutMillis"`
+	ExecutionStartedAt     *time.Time `json:"executionStartedAt,omitempty"`
+	ExecutionDeadline      *time.Time `json:"executionDeadline,omitempty"`
+	ProbeDelayMillis       int        `json:"probeDelayMillis"`
 }
 
 type OperationStatus struct {
@@ -57,8 +62,8 @@ type OperationStatus struct {
 }
 
 func NewRequest(now time.Time, timeout time.Duration, mode ProbeMode) (Request, error) {
-	if timeout <= 0 || timeout > maxProbeDelay {
-		return Request{}, fmt.Errorf("elevation timeout must be between 1ms and %s", maxProbeDelay)
+	if timeout <= 0 || timeout > maxExecutionTimeout {
+		return Request{}, fmt.Errorf("elevation timeout must be between 1ms and %s", maxExecutionTimeout)
 	}
 	delay, err := probeDelay(mode, timeout)
 	if err != nil {
@@ -71,13 +76,32 @@ func NewRequest(now time.Time, timeout time.Duration, mode ProbeMode) (Request, 
 	}
 
 	return Request{
-		Version:          contractVersion,
-		ID:               hex.EncodeToString(identifier),
-		ActionID:         ActionM1ElevationProbe,
-		ProbeMode:        mode,
-		ExpiresAt:        now.UTC().Add(timeout),
-		ProbeDelayMillis: int(delay / time.Millisecond),
+		Version:                contractVersion,
+		ID:                     hex.EncodeToString(identifier),
+		ActionID:               ActionM1ElevationProbe,
+		ProbeMode:              mode,
+		CreatedAt:              now.UTC(),
+		ExecutionTimeoutMillis: int(timeout / time.Millisecond),
+		ProbeDelayMillis:       int(delay / time.Millisecond),
 	}, nil
+}
+
+func (r Request) Activate(now time.Time) (Request, error) {
+	if r.Activated() {
+		return Request{}, errors.New("elevation request is already activated")
+	}
+	startedAt := now.UTC()
+	deadline := startedAt.Add(r.executionTimeout())
+	r.ExecutionStartedAt = &startedAt
+	r.ExecutionDeadline = &deadline
+	if err := r.Validate(startedAt); err != nil {
+		return Request{}, err
+	}
+	return r, nil
+}
+
+func (r Request) Activated() bool {
+	return r.ExecutionStartedAt != nil && r.ExecutionDeadline != nil
 }
 
 func (r Request) Validate(now time.Time) error {
@@ -96,13 +120,39 @@ func (r Request) Validate(now time.Time) error {
 	if !r.ProbeMode.valid() {
 		return errors.New("elevation probe mode is not allow-listed")
 	}
+	if r.CreatedAt.IsZero() || r.CreatedAt.After(now.UTC().Add(time.Second)) {
+		return errors.New("invalid elevation request creation time")
+	}
+	if r.ExecutionTimeoutMillis <= 0 || time.Duration(r.ExecutionTimeoutMillis)*time.Millisecond > maxExecutionTimeout {
+		return errors.New("invalid elevation execution timeout")
+	}
 	if r.ProbeDelayMillis < 0 || time.Duration(r.ProbeDelayMillis)*time.Millisecond > maxProbeDelay {
 		return errors.New("invalid elevation probe delay")
 	}
-	if !r.ExpiresAt.After(now.UTC()) {
-		return errors.New("elevation request has expired")
+	if (r.ExecutionStartedAt == nil) != (r.ExecutionDeadline == nil) {
+		return errors.New("incomplete elevation execution window")
+	}
+	if r.Activated() {
+		startedAt := r.ExecutionStartedAt.UTC()
+		deadline := r.ExecutionDeadline.UTC()
+		if startedAt.Before(r.CreatedAt.UTC()) {
+			return errors.New("elevation execution starts before request creation")
+		}
+		if deadline.Sub(startedAt) != r.executionTimeout() {
+			return errors.New("invalid elevation execution window")
+		}
+		if startedAt.After(now.UTC().Add(time.Second)) {
+			return errors.New("elevation execution window starts in the future")
+		}
+		if !deadline.After(now.UTC()) {
+			return errors.New("elevation execution window has expired")
+		}
 	}
 	return nil
+}
+
+func (r Request) executionTimeout() time.Duration {
+	return time.Duration(r.ExecutionTimeoutMillis) * time.Millisecond
 }
 
 func (m ProbeMode) valid() bool {
@@ -116,7 +166,7 @@ func probeDelay(mode ProbeMode, timeout time.Duration) (time.Duration, error) {
 	case ProbeModeCancellation:
 		return timeout / 2, nil
 	case ProbeModeTimeout:
-		return timeout, nil
+		return timeout + timeoutProbeOverrun, nil
 	default:
 		return 0, errors.New("elevation probe mode is not allow-listed")
 	}

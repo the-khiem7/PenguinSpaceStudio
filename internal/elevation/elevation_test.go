@@ -2,6 +2,7 @@ package elevation
 
 import (
 	"context"
+	"errors"
 	"strings"
 	"testing"
 	"time"
@@ -24,7 +25,11 @@ func TestRequestRejectsUnknownActionAndExpiredRequest(t *testing.T) {
 	}
 
 	request.ProbeMode = ProbeModeConsent
-	request.ExpiresAt = time.Now().UTC().Add(-time.Second)
+	request.CreatedAt = time.Now().UTC().Add(-3 * time.Second)
+	request, err = request.Activate(time.Now().UTC().Add(-2 * time.Second))
+	if err != nil {
+		t.Fatal(err)
+	}
 	if err := request.Validate(time.Now().UTC()); err == nil || !strings.Contains(err.Error(), "expired") {
 		t.Fatalf("expected expiry rejection, got %v", err)
 	}
@@ -44,8 +49,68 @@ func TestRequestUsesFixedSafeProbeProfiles(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if timeout.ProbeDelayMillis != 2000 {
-		t.Fatalf("timeout delay = %dms, want 2000ms", timeout.ProbeDelayMillis)
+	if timeout.ProbeDelayMillis != 2250 {
+		t.Fatalf("timeout delay = %dms, want 2250ms", timeout.ProbeDelayMillis)
+	}
+}
+
+func TestControllerConsentWaitDoesNotConsumeExecutionTimeout(t *testing.T) {
+	store := NewStore(t.TempDir())
+	consentWait := 80 * time.Millisecond
+	controller := NewController(store, LauncherFunc(func(id string) error {
+		time.Sleep(consentWait)
+		go func() { _, _ = store.RunM1Probe(context.Background(), id) }()
+		return nil
+	}), 40*time.Millisecond)
+
+	startedAt := time.Now()
+	if _, err := controller.StartM1Probe(ProbeModeConsent); err != nil {
+		t.Fatal(err)
+	}
+	status := waitForTerminal(t, controller)
+	if status.State != StateSucceeded {
+		t.Fatalf("got %s after %s: %s", status.State, time.Since(startedAt), status.Message)
+	}
+	if elapsed := time.Since(startedAt); elapsed < consentWait {
+		t.Fatalf("operation completed before simulated consent returned: %s", elapsed)
+	}
+}
+
+func TestControllerTimeoutBeginsAfterConsent(t *testing.T) {
+	store := NewStore(t.TempDir())
+	consentWait := 80 * time.Millisecond
+	executionTimeout := 40 * time.Millisecond
+	controller := NewController(store, LauncherFunc(func(id string) error {
+		time.Sleep(consentWait)
+		go func() { _, _ = store.RunM1Probe(context.Background(), id) }()
+		return nil
+	}), executionTimeout)
+
+	startedAt := time.Now()
+	if _, err := controller.StartM1Probe(ProbeModeTimeout); err != nil {
+		t.Fatal(err)
+	}
+	status := waitForTerminal(t, controller)
+	if status.State != StateTimedOut {
+		t.Fatalf("got %s after %s: %s", status.State, time.Since(startedAt), status.Message)
+	}
+	if elapsed := time.Since(startedAt); elapsed < consentWait+executionTimeout {
+		t.Fatalf("execution timeout consumed consent wait: completed after %s", elapsed)
+	}
+}
+
+func TestControllerReportsElevationRefusal(t *testing.T) {
+	store := NewStore(t.TempDir())
+	controller := NewController(store, LauncherFunc(func(string) error {
+		return errors.New("the operation was canceled by the user")
+	}), time.Second)
+
+	if _, err := controller.StartM1Probe(ProbeModeConsent); err != nil {
+		t.Fatal(err)
+	}
+	status := waitForTerminal(t, controller)
+	if status.State != StateFailed || !strings.Contains(status.Message, "canceled by the user") {
+		t.Fatalf("got %s: %s", status.State, status.Message)
 	}
 }
 

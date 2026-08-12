@@ -75,11 +75,21 @@ func (c *Controller) run(request Request) {
 		c.set(statusFor(request, StateFailed, "Elevation was not launched: "+err.Error()))
 		return
 	}
+	activated, err := request.Activate(time.Now().UTC())
+	if err != nil {
+		c.set(statusFor(request, StateFailed, "Elevation execution window was not activated: "+err.Error()))
+		return
+	}
+	if err := c.store.SaveRequest(activated); err != nil {
+		c.set(statusFor(request, StateFailed, "Elevation execution window was not saved: "+err.Error()))
+		return
+	}
+	request = activated
 	c.set(statusFor(request, StateRunning, "Elevated helper started; waiting for its safe probe result."))
 
 	ticker := time.NewTicker(c.poll)
 	defer ticker.Stop()
-	timeout := time.NewTimer(time.Until(request.ExpiresAt))
+	timeout := time.NewTimer(time.Until(*request.ExecutionDeadline))
 	defer timeout.Stop()
 
 	for {
@@ -91,6 +101,10 @@ func (c *Controller) run(request Request) {
 		select {
 		case <-ticker.C:
 		case <-timeout.C:
+			if status, err := c.store.LoadStatus(request.ID); err == nil && status.State.Terminal() {
+				c.set(status)
+				return
+			}
 			_ = c.store.RequestCancellation(request.ID)
 			c.set(statusFor(request, StateTimedOut, "Elevation probe timed out; no cleanup command was started."))
 			return
