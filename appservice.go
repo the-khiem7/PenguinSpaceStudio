@@ -2,18 +2,28 @@ package main
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"path/filepath"
+	"sync"
 	"time"
 
 	"github.com/the-khiem7/PenguinSpaceStudio/internal/core"
 	"github.com/the-khiem7/PenguinSpaceStudio/internal/elevation"
 	"github.com/the-khiem7/PenguinSpaceStudio/internal/history"
+	bunprovider "github.com/the-khiem7/PenguinSpaceStudio/internal/providers/bun"
+	npmprovider "github.com/the-khiem7/PenguinSpaceStudio/internal/providers/npm"
+	pnpmprovider "github.com/the-khiem7/PenguinSpaceStudio/internal/providers/pnpm"
+	uvprovider "github.com/the-khiem7/PenguinSpaceStudio/internal/providers/uv"
 )
 
 type AppService struct {
-	orchestrator *core.Orchestrator
-	history      *history.Store
-	elevation    *elevation.Controller
+	orchestrator  *core.Orchestrator
+	history       *history.Store
+	elevation     *elevation.Controller
+	providerMu    sync.Mutex
+	providers     map[string]core.Provider
+	providerPlans map[string]core.CleanupPlan
 }
 
 func NewAppService() (*AppService, error) {
@@ -32,6 +42,13 @@ func NewAppService() (*AppService, error) {
 		orchestrator: core.NewOrchestrator(core.NewFixtureProvider(), store),
 		history:      store,
 		elevation:    elevation.NewController(elevationStore, newElevationLauncher(), 30*time.Second),
+		providers: map[string]core.Provider{
+			bunprovider.ProviderID:  bunprovider.NewSystemProvider(),
+			npmprovider.ProviderID:  npmprovider.NewSystemProvider(),
+			pnpmprovider.ProviderID: pnpmprovider.NewSystemProvider(),
+			uvprovider.ProviderID:   uvprovider.NewSystemProvider(),
+		},
+		providerPlans: make(map[string]core.CleanupPlan),
 	}, nil
 }
 
@@ -42,8 +59,8 @@ func (s *AppService) Close() error {
 func (s *AppService) Dashboard() core.Dashboard {
 	return core.Dashboard{
 		ApplicationName: "PenguinSpace",
-		Stage:           "M1 fixture and elevation probe ready",
-		SafetyMessage:   "No filesystem or tool command is executed by the fixture or elevation probe.",
+		Stage:           "M2 Bun, npm, pnpm, and uv providers ready",
+		SafetyMessage:   "The fixture is no-op; real cleanup requires an inspected backend plan and explicit confirmation.",
 	}
 }
 
@@ -53,6 +70,69 @@ func (s *AppService) RunFixtureScenario() (core.Scenario, error) {
 
 func (s *AppService) RecentHistory() ([]core.HistoryRecord, error) {
 	return s.history.List(context.Background(), 20)
+}
+
+func (s *AppService) InspectDeveloperProvider(providerID string) (core.ProviderInspection, error) {
+	provider, err := s.provider(providerID)
+	if err != nil {
+		return core.ProviderInspection{}, err
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	inspection, err := core.InspectProvider(ctx, provider)
+	if err != nil {
+		return core.ProviderInspection{}, err
+	}
+	s.providerMu.Lock()
+	s.providerPlans[providerID] = inspection.Plan
+	s.providerMu.Unlock()
+	return inspection, nil
+}
+
+func (s *AppService) ExecuteDeveloperProvider(providerID string, confirmed bool) (core.ProviderCleanupOutcome, error) {
+	if !confirmed {
+		return core.ProviderCleanupOutcome{}, errors.New("provider cleanup requires explicit confirmation")
+	}
+	provider, err := s.provider(providerID)
+	if err != nil {
+		return core.ProviderCleanupOutcome{}, err
+	}
+	s.providerMu.Lock()
+	plan := s.providerPlans[providerID]
+	delete(s.providerPlans, providerID)
+	s.providerMu.Unlock()
+	if plan.ID == "" {
+		return core.ProviderCleanupOutcome{}, errors.New("inspect the provider again before cleanup")
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
+	defer cancel()
+	execution, err := provider.Execute(ctx, plan, true)
+	if err != nil {
+		return core.ProviderCleanupOutcome{}, err
+	}
+	verification, err := provider.Verify(ctx, plan)
+	if err != nil {
+		return core.ProviderCleanupOutcome{}, err
+	}
+	if err := s.history.Append(ctx, core.HistoryRecord{
+		ID:             fmt.Sprintf("provider-%d", time.Now().UnixNano()),
+		ProviderID:     plan.ProviderID,
+		PlanID:         plan.ID,
+		ReclaimedBytes: verification.ReclaimedActual.Bytes,
+		CreatedAt:      time.Now().UTC(),
+	}); err != nil {
+		return core.ProviderCleanupOutcome{}, err
+	}
+	return core.ProviderCleanupOutcome{Execution: execution, Verification: verification}, nil
+}
+
+func (s *AppService) provider(providerID string) (core.Provider, error) {
+	provider, ok := s.providers[providerID]
+	if !ok {
+		return nil, fmt.Errorf("unknown developer provider %q", providerID)
+	}
+	return provider, nil
 }
 
 func (s *AppService) StartElevationProbe(mode elevation.ProbeMode) (elevation.OperationStatus, error) {

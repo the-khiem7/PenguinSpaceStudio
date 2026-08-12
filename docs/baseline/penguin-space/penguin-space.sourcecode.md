@@ -4,16 +4,18 @@ pack: "penguin-space"
 document: "sourcecode"
 status: "active"
 updated: "2026-08-12"
-code_ref: "d0bc468"
+code_ref: "uncommitted"
 ---
 
-# Architecture and M1 implementation
+# Architecture and implementation
 
-The M1 bootstrap is implemented in commit `5ba3fe8`. `main.go` hosts the Wails application, `AppService` exposes typed bindings, `internal/core` owns the fixture lifecycle, and `internal/history` persists verified fixture outcomes. The broader provider, Docker/WSL, and project-discovery designs remain planned rather than implemented; the limited elevation prototype is described below.
+The M1 bootstrap is implemented in commit `5ba3fe8`. `main.go` hosts the Wails application, `AppService` exposes typed bindings, `internal/core` owns provider lifecycle models, and `internal/history` persists verified outcomes. Docker/WSL, project discovery, and every developer-tool provider except the current uncommitted Bun, npm, conditional pnpm, and uv slices remain planned rather than implemented; the limited elevation prototype and provider boundaries are described below.
 
 The M1 elevation continuation is implemented in `6ee788d`, with controlled probe modes/UI pending state in `8fc559a` and the consent/execution timing fix in `d0bc468`. `internal/elevation` owns a fixed `m1.elevation.probe` request contract, persistence, helper execution, and a status controller. `elevation_launcher_windows.go` launches the current executable through the Windows `runas` verb; `elevated_helper.go` accepts only `--elevated-helper --elevation-request-id <opaque-id>`, then loads and validates the stored request. The only allow-listed action is a no-op probe. The UI exposes exactly three modes: `consent` has no delay, `cancellation-test` waits for half of the fixed operation window, and `timeout-test` deliberately waits 250 ms beyond that window so timeout wins without an equality race. It passes Wails-generated `ProbeMode` values, sets a local pending state before the asynchronous start returns, and disables competing starts. No provider command, cleanup path, or arbitrary process is represented in the contract.
 
 Contract version 2 separates request creation from execution activation. `NewRequest` records creation time and the allow-listed duration but no execution deadline. After synchronous `Launcher.Launch` returns successfully, `Controller.run` calls `Activate`, atomically persists `ExecutionStartedAt` and `ExecutionDeadline`, and starts its timer against that deadline. An elevated helper that wins the process-start race polls the request for up to five seconds until activation is published. Regression tests simulate consent taking longer than the execution timeout and prove that both immediate success and timeout begin after consent. Full Docker verification/build passed; Windows acceptance observed success, cancellation, timeout, and the full visible fixture lifecycle. Explicit UAC refusal remains unverified only because the current host's Never notify setting auto-approves `runas`.
+
+The current M2 working tree generalizes the core `Provider` interface and adds a provider registry plus backend plan map. `internal/providers/common` centralizes command execution, broad-path rejection, symlink-safe traversal, overflow checks, path equality, and Windows child-process creation with `CREATE_NO_WINDOW`. Bun supports major 1; npm supports majors 10 and 11; pnpm supports majors 11 and 12 only when `storeDir` resolves to an explicit absolute storage root; uv supports the pre-1.0 minor line 0.12.x. Unknown versions are detected but cannot produce plans. The Bun provider uses `bun pm cache` from a private temporary manifest context, measures the returned global cache, classifies Safe/Download, and explains hardlink effects. The npm provider uses `npm config get cache`, measures only the managed `_cacache` child, classifies Review/Download because cleanup requires `--force`, and explicitly excludes `_logs` plus npx cache. Npm `cache verify` is deliberately not a scan command because official behavior includes garbage collection. The pnpm provider runs configuration and store commands from an owned temporary working directory, refuses implicit per-disk store discovery without project-root drive context, measures the explicit versioned store as observed logical bytes, marks the pre-prune estimate unavailable, and invokes only `pnpm store prune`. The uv provider also uses an owned temporary `--directory`, resolves the storage root with `uv cache dir`, measures total observed bytes with `uv cache size --preview-features cache-size`, marks the pre-prune estimate unavailable, and invokes only `uv cache prune`. `AppService` retains each issued plan instead of accepting a frontend target. After confirmation, each provider detects its tool again, resolves and compares the current scope, runs its allow-listed tool-native cleanup, remeasures, and persists the result. The reusable Vue `ProviderCard` exposes inspect, review, cancel, and confirm states; the frontend never owns a command or target path.
 
 ```mermaid
 flowchart LR
@@ -48,11 +50,11 @@ The frontend contract is Vue 3 + TypeScript + Vite, using pinned Bun `1.3.14` as
 
 ## Persistence and privilege boundaries
 
-Measurements are stored as exact `uint64` byte values with a separate provenance/value-kind field: measured, estimated, logical deletion, or physical reclamation. Formatting into IEC units is a presentation concern only.
+Measurements are stored as exact `uint64` byte values with a separate kind: `measured-logical`, `estimated-logical`, `measured-physical`, or `unavailable`. An observed total and an estimated reclaim are distinct fields, so a provider such as pnpm can truthfully show the store size without claiming those bytes are pruneable. Formatting into IEC units is a presentation concern only.
 
 The implemented store uses pure-Go `modernc.org/sqlite` `v1.56.0`. It creates a SQLite database at `%LOCALAPPDATA%\\PenguinSpace\\penguinspace.db` on Windows, creates the initial `cleanup_history` table, and records SQLite `user_version = 1`. It currently persists fixture history only; settings and complete plan/outcome persistence belong to later product surfaces, while retention and diagnostics belong to production hardening. The application does not open an untrusted database file as its own state.
 
-The desktop process remains non-elevated. The implemented helper is limited to the M1 no-op probe and is partially runtime-verified. A privileged operation for a real provider remains planned: it must be a validated, narrowly scoped plan passed to a separate UAC `runas` helper and must not reuse this test-only probe contract.
+The desktop process remains non-elevated. Developer-tool cache cleanup runs without the M1 elevation helper and is guarded by an inspected backend-owned plan plus path revalidation. The implemented elevated helper remains limited to the M1 no-op probe. A privileged operation for another real provider remains planned: it must be a validated, narrowly scoped plan passed to a separate UAC `runas` helper and must not reuse this test-only probe contract.
 
 ## Provider lifecycle
 
@@ -61,6 +63,8 @@ Detect → Inspect → Measure → Classify → Estimate → Plan → Confirm �
 ```
 
 The UI can display a plan only after classification. A plan must expose provider/item, current and estimated reclaimable size, risk, recovery cost, consequence, privilege requirement, shutdown prerequisite, and verification approach.
+
+For Bun, the current UI exposes logical measurement and the consequence that hardlinks can make physical reclaim lower. For npm, it exposes only `_cacache` bytes and warns that logs/npx are out of scope. For pnpm, an implicit per-disk store produces detection plus an explanation but no action; an explicit `storeDir` produces observed total bytes and an unavailable estimate until `store prune` completes. For uv, the total cache is observed while reclaimable bytes remain unavailable until prune; the consequence explicitly includes removal of centralized project environments and possible package downloads or source rebuilds. None claims physical reclaimed bytes. Bun and npm cleanup commands passed isolated 4 KiB Windows fixtures, and both real-cache UI acceptance runs stopped at and cancelled their confirmation gates. The pnpm fixture used an explicit store and verified 9,615 logical bytes removed without touching the user's per-disk stores. The uv boundary fixture verified exactly 4 KiB removed inside the cache while preserving a 2 KiB outside sentinel; real uv UI acceptance measured 3.45 GiB and cancelled before execution. A 30-second filesystem traversal timeout materially changed uv inspection to the official constant-time size command. The subsequent `CREATE_NO_WINDOW` patch passed focused tests, Windows compile checks, full Docker verification, and build, but its no-console behavior still needs one interactive Windows recheck.
 
 ## Required core models
 

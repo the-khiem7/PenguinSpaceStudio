@@ -28,8 +28,18 @@ const (
 	StorageDisposable StorageClass = "Disposable cache"
 )
 
+type MeasurementKind string
+
+const (
+	MeasurementMeasuredLogical  MeasurementKind = "measured-logical"
+	MeasurementEstimatedLogical MeasurementKind = "estimated-logical"
+	MeasurementMeasuredPhysical MeasurementKind = "measured-physical"
+	MeasurementUnavailable      MeasurementKind = "unavailable"
+)
+
 type Measurement struct {
-	Bytes uint64 `json:"bytes"`
+	Bytes uint64          `json:"bytes"`
+	Kind  MeasurementKind `json:"kind"`
 }
 
 type StorageItem struct {
@@ -39,6 +49,16 @@ type StorageItem struct {
 	Risk         RiskLevel    `json:"risk"`
 	RecoveryCost RecoveryCost `json:"recoveryCost"`
 	Measured     Measurement  `json:"measured"`
+	Location     string       `json:"location,omitempty"`
+}
+
+type ProviderDetection struct {
+	ProviderID     string `json:"providerId"`
+	Detected       bool   `json:"detected"`
+	Supported      bool   `json:"supported"`
+	Version        string `json:"version,omitempty"`
+	ExecutablePath string `json:"executablePath,omitempty"`
+	Message        string `json:"message"`
 }
 
 type ScanResult struct {
@@ -50,9 +70,11 @@ type ScanResult struct {
 type CleanupAction struct {
 	ID           string       `json:"id"`
 	ItemID       string       `json:"itemId"`
+	Location     string       `json:"location,omitempty"`
 	Risk         RiskLevel    `json:"risk"`
 	RecoveryCost RecoveryCost `json:"recoveryCost"`
 	Consequence  string       `json:"consequence"`
+	Observed     Measurement  `json:"observed"`
 	Estimated    Measurement  `json:"estimated"`
 }
 
@@ -81,6 +103,28 @@ type Scenario struct {
 	Plan         CleanupPlan        `json:"plan"`
 	Execution    ExecutionResult    `json:"execution"`
 	Verification VerificationResult `json:"verification"`
+}
+
+type ProviderInspection struct {
+	Detection        ProviderDetection `json:"detection"`
+	Scan             ScanResult        `json:"scan"`
+	Plan             CleanupPlan       `json:"plan"`
+	ExecutionEnabled bool              `json:"executionEnabled"`
+}
+
+type ProviderCleanupOutcome struct {
+	Execution    ExecutionResult    `json:"execution"`
+	Verification VerificationResult `json:"verification"`
+}
+
+type Provider interface {
+	ID() string
+	ExecutionEnabled() bool
+	Detect(ctx context.Context) (ProviderDetection, error)
+	Scan(ctx context.Context, detection ProviderDetection) (ScanResult, error)
+	Plan(scan ScanResult) (CleanupPlan, error)
+	Execute(ctx context.Context, plan CleanupPlan, confirmed bool) (ExecutionResult, error)
+	Verify(ctx context.Context, plan CleanupPlan) (VerificationResult, error)
 }
 
 type Dashboard struct {

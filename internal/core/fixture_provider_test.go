@@ -16,7 +16,18 @@ func (m *memoryHistory) Append(_ context.Context, record HistoryRecord) error {
 
 func TestFixtureProviderRequiresConfirmation(t *testing.T) {
 	provider := NewFixtureProvider()
-	plan := provider.Plan(provider.Scan(context.Background()))
+	detection, err := provider.Detect(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	scan, err := provider.Scan(context.Background(), detection)
+	if err != nil {
+		t.Fatal(err)
+	}
+	plan, err := provider.Plan(scan)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	if _, err := provider.Execute(context.Background(), plan, false); err == nil {
 		t.Fatal("expected an unconfirmed plan to be rejected")

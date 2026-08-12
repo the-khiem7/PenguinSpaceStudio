@@ -4,12 +4,12 @@ pack: "penguin-space"
 document: "useguide"
 status: "draft"
 updated: "2026-08-12"
-code_ref: "d0bc468"
+code_ref: "uncommitted"
 ---
 
 # Intended product interaction contract
 
-This is the Product Goal interaction contract. M1 now implements its left-navigation shell, a visible fixture lifecycle panel, and a partially runtime-verified Windows UAC probe panel; all other pages and real cleanup workflows remain planned.
+This is the Product Goal interaction contract. M1 implements its left-navigation shell, fixture lifecycle, and partially runtime-verified Windows UAC probe. The current uncommitted M2 working tree adds reusable Developer Tools workflows for Bun, npm, a conditional pnpm slice, and uv; every other provider and complete product page remains planned.
 
 The UAC panel's **Test Windows consent** action is a fixed no-op probe, not a cleanup request. Commit `8fc559a` disables every start action immediately while a start is pending or active, so a second click cannot surface the previous stale `already in progress` error. Commit `d0bc468` starts the bounded execution window only after Windows elevation launches. **Test cancellation** starts a delayed no-op; select **Cancel probe** while it is active. **Test timeout** outlives the fixed execution window and ends as `timed-out`. On 2026-08-12, computer-controlled acceptance against the rebuilt executable observed `Succeeded`, `Cancelled`, and `Timed-Out`, each with explicit no-cleanup wording where applicable. These controls still cannot invoke a cleanup provider or shell command.
 
@@ -30,6 +30,14 @@ Launch → Scan → Measure → Classify → Dashboard → Review & Clean → Cl
 The application must not run cleanup as part of scanning or at launch. Home is observability and routes the user to **Review & Clean**.
 
 M1's only runnable lifecycle is deliberately non-destructive: it scans one in-memory fixture, produces one Safe plan, requires backend confirmation, mutates no filesystem/tool state, verifies exact fixture bytes, and records history. It demonstrates the boundary only; it is not user-facing cleanup support.
+
+The Bun card is the first real cleanup workflow. **Inspect Bun cache** detects only supported Bun 1.x installations, measures logical cache bytes, and displays the cache location plus Safe/Download consequence text. **Review Bun cleanup** reveals an explicit second-stage choice. **Cancel** must close review without executing or invalidating the displayed measurement. **Confirm and clear** may invoke the backend-owned plan; the backend rejects a missing plan or a cache path that changed after review, then remeasures logical bytes and records the outcome. The UI must never describe the logical result as physical reclaim because Bun may hardlink cache entries on Windows.
+
+The npm card uses the same review contract for npm 10/11 but is Review/Download rather than Safe. It measures only `_cacache`, not `_logs`, npx cache, or arbitrary cache-root files. Its consequence must say that `--force` is required and future installs may download packages again. Windows acceptance must preserve the measurement when review is cancelled; real user cache deletion still requires action-time confirmation.
+
+The pnpm card supports pnpm 11/12 and must distinguish detection from actionable support. Without an explicit absolute `storeDir`, it explains that pnpm's default stores are per disk and that project-root drive context is deferred to M4; it shows no measured size, no estimate, and no review button. With an explicit `storeDir`, it shows the versioned store's observed logical size, labels the reclaim estimate unavailable, and offers a Safe/Download review for `pnpm store prune`. Confirmation is still mandatory. After execution, the card reports the before/after difference as verified logical bytes; it must never relabel the entire pre-prune store as reclaimable.
+
+The uv card supports uv 0.12.x. **Inspect uv cache** resolves the actual cache location and shows its total observed size, but labels the pre-prune reclaim estimate unavailable because `uv cache prune` decides what is unused. The Safe/Download consequence must disclose that prune also removes all cached centralized project environments, which will be recreated, and that future work may download packages or rebuild source distributions. Review and explicit confirmation remain mandatory. Windows acceptance detected uv 0.12.1, displayed 3.45 GiB, opened review, and cancelled with the measurement intact; the real user cache was not pruned. The common command runner has since been patched to suppress child console windows, but the operator must still repeat this inspection once and confirm that no Windows Terminal window flashes.
 
 ## Home contract
 

@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref } from "vue";
 import { backend, ElevationProbeMode, type ElevationStatus, type Scenario } from "./backend";
+import ProviderCard from "./components/ProviderCard.vue";
 
 const stage = ref("Connecting to the local service…");
 const safetyMessage = ref("All cleanup requires a reviewed plan.");
@@ -9,6 +10,7 @@ const error = ref("");
 const running = ref(false);
 const elevation = ref<ElevationStatus | null>(null);
 const elevationStarting = ref(false);
+const detectedDeveloperProviders = ref<Record<string, string>>({});
 let elevationPoller: ReturnType<typeof setInterval> | undefined;
 
 const reclaimed = computed(() => scenario.value?.verification.reclaimedActual.bytes ?? 0);
@@ -16,6 +18,11 @@ const formattedReclaimed = computed(() => `${(reclaimed.value / 1024 / 1024).toF
 const elevationBusy = computed(() =>
   elevationStarting.value ||
   (elevation.value !== null && !["succeeded", "failed", "cancelled", "timed-out"].includes(elevation.value.state)),
+);
+const detectedProviderLabels = computed(() => Object.values(detectedDeveloperProviders.value));
+const detectedProviders = computed(() => 1 + detectedProviderLabels.value.length);
+const detectedProviderSummary = computed(() =>
+  detectedProviderLabels.value.length > 0 ? `Fixture + ${detectedProviderLabels.value.join(" + ")}` : "Fixture; inspect providers to detect them",
 );
 
 onMounted(async () => {
@@ -70,6 +77,13 @@ async function cancelElevationProbe() {
     error.value = `Elevation probe cancellation failed: ${String(cause)}`;
   }
 }
+
+function recordProviderDetection(payload: { providerId: string; label: string; detected: boolean }) {
+  const next = { ...detectedDeveloperProviders.value };
+  if (payload.detected) next[payload.providerId] = payload.label;
+  else delete next[payload.providerId];
+  detectedDeveloperProviders.value = next;
+}
 </script>
 
 <template>
@@ -97,7 +111,7 @@ async function cancelElevationProbe() {
       </header>
 
       <section class="metrics" aria-label="Storage overview">
-        <article><span>Detected providers</span><strong>1</strong><small>Fixture only in M1</small></article>
+        <article><span>Detected providers</span><strong>{{ detectedProviders }}</strong><small>{{ detectedProviderSummary }}</small></article>
         <article><span>Reviewable estimate</span><strong>{{ scenario ? formattedReclaimed : "—" }}</strong><small>Exact bytes retained by backend</small></article>
         <article><span>Actual reclaimed</span><strong>{{ scenario ? formattedReclaimed : "—" }}</strong><small>Shown only after verification</small></article>
       </section>
@@ -126,10 +140,11 @@ async function cancelElevationProbe() {
 
         <aside class="panel safety-panel">
           <p class="eyebrow">Safety contract</p>
-          <h2>Nothing destructive is wired yet.</h2>
+          <h2>Only reviewed developer cache cleanup is wired.</h2>
           <ul>
             <li>Go owns provider semantics and execution.</li>
             <li>Confirmation is mandatory before execution.</li>
+            <li>Every provider cache path is rechecked after review.</li>
             <li>The M1 fixture mutates memory only.</li>
             <li>SQLite records verified outcomes locally.</li>
           </ul>
@@ -147,6 +162,41 @@ async function cancelElevationProbe() {
             </div>
           </div>
         </aside>
+      </section>
+
+      <section class="provider-stack" id="developer-tools" aria-label="Developer tool providers">
+        <ProviderCard
+          provider-id="bun.global-cache"
+          provider-label="Bun"
+          title="Bun global module cache"
+          inspect-label="Inspect Bun cache"
+          description="Version-aware inspection, reviewed cleanup, and post-operation logical measurement. Physical reclaim may be lower because Bun can use hardlinks."
+          @detection="recordProviderDetection"
+        />
+        <ProviderCard
+          provider-id="npm.global-cache"
+          provider-label="npm"
+          title="npm managed content cache"
+          inspect-label="Inspect npm cache"
+          description="Measures only npm-managed _cacache content. Logs and npx cache are outside this action; cleanup remains Review because npm requires --force."
+          @detection="recordProviderDetection"
+        />
+        <ProviderCard
+          provider-id="pnpm.global-store"
+          provider-label="pnpm"
+          title="pnpm configured store"
+          inspect-label="Inspect pnpm store"
+          description="An explicit storeDir can be measured and pruned; default per-disk stores require project-root context. Pruneable bytes remain unavailable before execution."
+          @detection="recordProviderDetection"
+        />
+        <ProviderCard
+          provider-id="uv.global-cache"
+          provider-label="uv"
+          title="uv global cache"
+          inspect-label="Inspect uv cache"
+          description="Prunes unused entries and centralized project environments. Total cache bytes are observable, but reclaimable bytes remain unavailable before execution."
+          @detection="recordProviderDetection"
+        />
       </section>
     </section>
   </main>

@@ -18,6 +18,48 @@ export type ElevationStatus = {
   updatedAt: string;
 };
 
+export type ProviderInspection = {
+  detection: {
+    providerId: string;
+    detected: boolean;
+    supported: boolean;
+    version?: string;
+    executablePath?: string;
+    message: string;
+  };
+  scan: {
+    providerId: string;
+    items: Array<{
+      name: string;
+      storageClass: string;
+      risk: string;
+      recoveryCost: string;
+      location?: string;
+      measured: { bytes: number; kind: string };
+    }>;
+  };
+  plan: {
+    actions: Array<{
+	  location?: string;
+      risk: string;
+      recoveryCost: string;
+      consequence: string;
+      observed: { bytes: number; kind: string };
+      estimated: { bytes: number; kind: string };
+    }>;
+  };
+  executionEnabled: boolean;
+};
+
+export type ProviderCleanupOutcome = {
+  execution: { planId: string; executed: boolean; destructive: boolean; message: string };
+  verification: {
+    planId: string;
+    measuredAfter: { bytes: number; kind: string };
+    reclaimedActual: { bytes: number; kind: string };
+  };
+};
+
 export const backend = {
   dashboard: () => AppService.Dashboard(),
   runFixtureScenario: (): Promise<Scenario> => AppService.RunFixtureScenario() as Promise<Scenario>,
@@ -25,4 +67,6 @@ export const backend = {
   cancelElevationProbe: (): Promise<ElevationStatus> => AppService.CancelElevationProbe() as Promise<ElevationStatus>,
   elevationStatus: (): Promise<ElevationStatus> => AppService.ElevationStatus() as Promise<ElevationStatus>,
   recentHistory: () => AppService.RecentHistory(),
+  inspectDeveloperProvider: (providerId: string): Promise<ProviderInspection> => AppService.InspectDeveloperProvider(providerId) as Promise<ProviderInspection>,
+  executeDeveloperProvider: (providerId: string): Promise<ProviderCleanupOutcome> => AppService.ExecuteDeveloperProvider(providerId, true) as Promise<ProviderCleanupOutcome>,
 };
