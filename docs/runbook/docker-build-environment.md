@@ -4,7 +4,7 @@
 
 PenguinSpace is a Windows-first desktop application using Wails 3, Go, Vue, Vite, and Bun. This runbook makes its build environment a Docker-only boundary: the Windows host is an editor and container orchestrator, not a place to install project toolchains or SDKs.
 
-M1 bootstrap is committed on `main` as `5ba3fe8` and contains `Dockerfile`, `docker-compose.yml`, Compose delegates, and a Wails/Go/Vue shell. The follow-on elevation-probe implementation is committed in `6ee788d`; commit `8fc559a` adds fixed no-op cancellation and timeout probe modes plus immediate duplicate-start feedback. With Rancher Desktop running, the latest Docker verification passed Bun/Vue/Wails binding generation, Go formatting/vet/tests, and a Windows cross-build. Docker build produced the current `out/penguinspace.exe` (13,545,984 bytes). The prior executable had already passed a hidden five-second process-start smoke test; the new executable still needs visible acceptance after its consent/timeout boundary is corrected. The user subsequently observed the visible original no-op elevation probe reach `Succeeded`. The Dockerfile now sets an explicit non-login toolchain `PATH`; use `sh -c` rather than `sh -lc` in diagnostics because a login shell resets `PATH`. UAC refusal/cancellation/timeout, new generated-shell acceptance, and installer/package creation remain separate work.
+M1 bootstrap is committed on `main` as `5ba3fe8` and contains `Dockerfile`, `docker-compose.yml`, Compose delegates, and a Wails/Go/Vue shell. The elevation probe is implemented across `6ee788d`, `8fc559a`, and the post-consent execution timing fix `d0bc468`. With Rancher Desktop running, the latest Docker verification passed Bun/Vue/Wails binding generation, Go formatting/vet/tests, and a Windows cross-build. Docker build produced `out/penguinspace.exe` (13,556,736 bytes; SHA-256 `f606c7a33c6ee13856db965cea2193c2e43197018fee30b6bbf078921125c4f1`). The rebuilt executable passed visible Windows auto-consent, cancellation, timeout, and 3.00 MiB fixture-lifecycle smoke tests. The host's UAC level is Never notify, so `runas` auto-approved and refusal could not be exercised; that runtime case requires a session that presents a prompt. This host also has unrelated Go and Bun executables installed, so it cannot supply clean-host evidence even though every PenguinSpace build command used Docker. The Dockerfile sets an explicit non-login toolchain `PATH`; use `sh -c` rather than `sh -lc` in diagnostics because a login shell resets `PATH`. Installer/package creation remains separate work.
 
 On 2026-08-11, an explicitly approved host-side `docker builder prune -af` reclaimed 6.151 GB of BuildKit cache. It did not remove images, containers, networks, or volumes. This was an operator maintenance action, not a PenguinSpace product capability; subsequent image builds will repopulate BuildKit cache.
 
@@ -54,7 +54,7 @@ After the Compose manifest exists, expose a small set of project scripts that de
 
 Each script must resolve to `docker compose ... run` and must not fall back to host `go`, `wails`, `npm`, or `vite`. CI can use an equivalent container image, but its success does not replace a documented local Docker path.
 
-Before considering the bootstrap complete, verify that a clean Windows host without Go, Wails, Bun build tooling, or Windows build SDKs can run the Docker verification command. M1 recorded container verification and a hidden Windows process-start smoke test; interactive acceptance remains required.
+Before considering the bootstrap complete, verify that a clean Windows host without Go, Wails, Bun build tooling, or Windows build SDKs can run the Docker verification command. M1 recorded container verification plus visible Windows success, cancellation, timeout, and fixture-lifecycle acceptance. Interactive UAC refusal remains required on a host/session that displays the prompt.
 
 ## Shared Rancher / WSL storage policy
 
@@ -94,7 +94,7 @@ There is no standing exception for a host toolchain. A temporary host install re
 - [x] Go, package-manager, and build caches stay out of the host profile and source checkout.
 - [x] `verify`, `build-windows`, and `shell` delegate only to Docker.
 - [ ] A clean Windows host completes the Docker verification path. (Container verification passed; clean-host audit remains.)
-- [ ] Docker space usage and a non-destructive cleanup path are documented.
+- [x] Docker space usage and a non-destructive cleanup path are documented; the approved BuildKit-only prune evidence is recorded above.
 
 ## References
 

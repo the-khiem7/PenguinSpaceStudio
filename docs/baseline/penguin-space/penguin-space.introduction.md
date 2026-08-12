@@ -4,7 +4,7 @@ pack: "penguin-space"
 document: "introduction"
 status: "active"
 updated: "2026-08-12"
-code_ref: "8fc559a"
+code_ref: "d0bc468"
 ---
 
 # PenguinSpace baseline
@@ -43,7 +43,7 @@ It is not a generic PC cleaner or merely a GUI for cache-clearing commands. Its 
 - The product decisions recorded in this pack are approved direction, not proof that a provider, UI, command, integration, cleanup, or VHDX operation currently works.
 - Docker-only verification and Windows cross-build pass through Compose. The generated Windows executable launched successfully for five seconds on the host in a hidden smoke test, then was stopped; this is process-start evidence, not interactive UI acceptance.
 - The fixture lifecycle scans, plans, requires confirmation, executes only an in-memory change, verifies exact reclaimed bytes, and persists a history record. It is not an implementation of any real cleanup provider or command.
-- Commit `8fc559a` adds three allow-listed no-op probe modes: immediate UAC consent, cancellable delay, and forced timeout. Vue disables every start action immediately while the request is in flight and consumes the generated Wails `ProbeMode` enum rather than duplicating string values. Docker `verify` passed after this change and Docker `build` produced `out/penguinspace.exe` (13,545,984 bytes). The new executable's interactive UAC cases remain unverified. The request expiry is currently calculated before Windows consent completes, so a slow operator response can consume the 30-second execution window; correct that timing boundary before acceptance.
+- Commit `d0bc468` upgrades the no-op elevation request to contract version 2 and activates its bounded 30-second execution window only after the Windows launcher returns successfully. The helper waits for that activation, so operator consent time no longer consumes execution time; repeated regression tests cover slow consent, timeout after consent, refusal mapping, cancellation, and allow-list validation. Docker `verify` and `build` passed and produced `out/penguinspace.exe` (13,556,736 bytes; SHA-256 `f606c7a33c6ee13856db965cea2193c2e43197018fee30b6bbf078921125c4f1`). On the Windows host with UAC set to Never notify, the rebuilt executable reached `Succeeded`, `Cancelled`, and `Timed-Out`; its visible fixture lifecycle completed 3.00 MiB through scan, plan, backend confirmation, no-filesystem execution, and verification. Interactive refusal remains unverified because this host configuration auto-approves `runas` without presenting a rejectable prompt.
 - Commands and external-documentation behaviour are time-sensitive and must be verified against current official sources before a provider is implemented.
 
 ## Storage model

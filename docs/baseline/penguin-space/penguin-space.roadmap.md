@@ -4,7 +4,7 @@ pack: "penguin-space"
 document: "roadmap"
 status: "active"
 updated: "2026-08-12"
-code_ref: "8fc559a"
+code_ref: "d0bc468"
 ---
 
 # Product roadmap and verification state
@@ -18,7 +18,7 @@ code_ref: "8fc559a"
 | Architecture and usage contract | Complete | Source-code and use-guide documents created because the proposal defines both materially |
 | Root proposal deletion | Complete | Root source removed after SHA-256 equality and pack-coverage verification |
 | Phase 0 — Research and decision closure | Complete with scoped deferrals | Nine decisions were resolved or explicitly deferred in the Phase 0 register; Docker-only toolchain spike passed without a host SDK |
-| Product implementation | M1 bootstrap implemented; milestone remains in progress | Pinned Docker verification, frontend build, Go tests, Windows cross-build, and hidden process-start smoke test passed; real provider/elevation/package work remains |
+| Product implementation | M1 core platform implemented; two environment gates remain open | Docker verification/build and visible fixture, consent, cancellation, and timeout acceptance passed; interactive UAC refusal needs a prompt-enabled session and the clean-host Docker path still needs evidence; real cleanup providers remain M2+ work |
 
 ## Phase 0 — Research and decision closure
 
@@ -52,11 +52,13 @@ Close the following decisions with an evidence record for each: pinned container
 
 **Implementation checkpoint (2026-08-10):** M1 bootstrap is committed on `main` as `5ba3fe8`. It contains `Dockerfile`, `docker-compose.yml`, Docker-only PowerShell delegates, `go.mod`, Vue/Vite/Bun frontend sources, Wails service bindings, and a schema-versioned SQLite history store. `docker compose run --rm verify` passed Bun `1.3.14`, Go `1.25.12`, Wails CLI `v3.0.0-beta.6`, Vue type-check/build, Go vet/tests for `internal`, and a Windows `CGO_ENABLED=0` cross-compile. `docker compose run --rm build` produced `out/penguinspace.exe`; a hidden five-second Windows process-start smoke test passed and the test process was stopped. The only executable provider is an in-memory fixture: it covers scan → plan → confirmation gate → execute → verify → SQLite history and deliberately invokes no filesystem or tool command.
 
-**Remaining M1 closure work:** separate the user-controlled UAC consent wait from the bounded helper execution window, then perform interactive Windows UAC refusal, cancellation, timeout, and final UI smoke tests against a rebuilt executable. The UAC-success no-op probe was observed in the visible UI on 2026-08-11. Do not mark a real provider, cleanup command, installer/package, or physical reclaim outcome as implemented.
+**Remaining M1 closure work:** perform one interactive Windows UAC refusal test on a host/session configured to present a consent prompt, and run the documented Docker verification path on a clean Windows host without the PenguinSpace build toolchains. Timing separation, regression tests, Docker verification/build on the current host, auto-consent success, cancellation, timeout, and final fixture/UI smoke are complete. Do not mark a real provider, cleanup command, installer/package, or physical reclaim outcome as implemented.
 
 **Elevation continuation checkpoint (2026-08-11):** commit `6ee788d` adds `internal/elevation`: a versioned, fixed `m1.elevation.probe` contract, JSON request/result files below the per-user application directory, allow-list validation, cancellation marker, terminal statuses, and controller tests for success, cancellation, timeout, expired contracts, and an unknown action. The Windows-only launcher uses `ShellExecute` with the `runas` verb to re-run PenguinSpace in helper mode; the helper accepts only a request ID and executes a no-op probe. The Vue shell exposes start, status polling, and cancellation. No cleanup command, target path, provider command, or physical storage mutation can cross this bridge. Docker `verify` passed Bun `1.3.14`, Go `1.25.12`, Wails bindings for 7 service methods, Vue type-check/build, gofmt, vet, all internal tests, and a Windows cross-build. Docker `build` produced `out/penguinspace.exe` (13,544,960 bytes); a hidden five-second Windows process-start smoke test passed and the exact test process was stopped. The user then ran the visible application and supplied UI evidence of `Succeeded` for the no-op elevation probe. A repeated start request displayed `already in progress` before that first operation rendered its terminal status; the guard behaved safely, but the UI needs immediate pending-state feedback. UAC refusal, cancellation, timeout, and the remaining visible UI acceptance are unverified.
 
 **M1 interaction follow-up checkpoint (2026-08-12):** commit `8fc559a` contains the fixed three-value `ProbeMode` allow-list: immediate `consent`, delayed `cancellation-test`, and `timeout-test` whose delay equals the controller's fixed 30-second deadline. Vue sets `elevationStarting` before its bridge call resolves, disables all start buttons while pending/active, and uses the generated Wails enum, so it cannot initiate a duplicate request or drift from the backend contract. Docker `verify` passed Wails bindings (5 enums), Vue type-check/build, gofmt, vet, every internal test, and Windows cross-build. Docker `build` produced `out/penguinspace.exe` (13,545,984 bytes). No new Windows runtime evidence exists yet. Code inspection on 2026-08-12 found that `NewRequest` sets `ExpiresAt` before `Launcher.Launch` waits for Windows consent; the controller creates its timer only afterward but uses the already-running absolute expiry. This can turn a slow consent response into a false timeout and must be corrected before acceptance. The operator explicitly allows long UAC response time and will assist when prompted; automation must wait rather than cancel the acceptance run.
+
+**M1 timing and Windows acceptance checkpoint (2026-08-12):** commit `d0bc468` replaces pre-consent absolute expiry with a two-phase request. `Controller.run` activates and atomically persists `ExecutionStartedAt` plus `ExecutionDeadline` only after `Launcher.Launch` succeeds; an early helper waits for activation. The timeout probe deliberately outlives the execution window by 250 ms, removing the equality race, and the controller rechecks terminal helper status at its deadline. Focused elevation tests passed 20 consecutive runs, including simulated 80 ms consent waits against 40 ms execution windows, timeout-after-consent, refusal-to-`failed`, cancellation, and allow-list validation. Full Docker `verify` passed Bun `1.3.14`, Wails binding generation, Vue type-check/build, gofmt, vet, all internal tests, and Windows cross-build. Docker `build` produced `out/penguinspace.exe` (13,556,736 bytes; SHA-256 `f606c7a33c6ee13856db965cea2193c2e43197018fee30b6bbf078921125c4f1`). Computer-controlled Windows acceptance observed `Succeeded`, `Cancelled`, and `Timed-Out`, then a visible fixture run reported 3.00 MiB estimated and verified with no filesystem command. This host uses UAC Never notify, so `runas` auto-approved and no refusal prompt could be produced; refusal remains the only open M1 runtime gate.
 
 ## Milestone 2 — Developer tool ecosystems
 
@@ -117,11 +119,11 @@ Cover failure recovery, locked files, permission failures, malformed output, par
 | Logical cleanup does not shrink VHDX | Misleading reclaimed-space claim | Separate logical, estimated compactable, and actual physical results |
 | UAC or environment shutdown fails | Cleanup/compaction stops partway | Plan-time privilege/shutdown indication, cancellation and recovery handling |
 | Host toolchain drift or cache pollution | Non-reproducible builds and WSL/Docker storage pressure | Keep all project toolchains and caches in pinned container images or named volumes; do not bind-mount host SDK/cache directories |
-| No code exists yet | Direction may be mistaken for implemented reality | Keep all status claims explicitly planned or unverified |
+| Real cleanup providers do not exist yet | Fixture/elevation evidence may be mistaken for product cleanup support | Keep provider, physical-reclaim, installer, and release claims explicitly planned or unverified |
 
 ## Exact next action
 
-Change the elevation timing contract so `awaiting-consent` does not consume the bounded no-op execution timeout, add regression tests, run Docker `verify` and `build`, then interactively validate UAC refusal, cancellation, timeout, and the generated Windows shell. Wait for the operator at UAC prompts instead of cancelling due to response delay. Begin M2 provider implementation only after those checks have evidence.
+First, use a Windows session whose UAC level presents a consent prompt, run **Test Windows consent**, choose **No**, and record the resulting `Failed` state; do not automate or silently change the host's security setting. Then run the documented Docker verification path on a clean Windows host without Go/Wails/Bun/Windows build SDKs. Close M1 and begin M2 only after both environment gates have evidence.
 
 ## Pack migration verification
 
