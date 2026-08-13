@@ -4,7 +4,7 @@ pack: "penguin-space"
 document: "introduction"
 status: "active"
 updated: "2026-08-14"
-code_ref: "HEAD (M3.5 exact Compose network removal)"
+code_ref: "HEAD (M3.6 read-only WSL/VHDX discovery)"
 ---
 
 # PenguinSpace baseline
@@ -40,7 +40,7 @@ It is not a generic PC cleaner or merely a GUI for cache-clearing commands. Its 
 - Milestone 1 bootstrap implementation is committed in `5ba3fe8`: a pinned Docker toolchain, Wails/Go/Vue shell, SQLite history store, and a fixture-only provider lifecycle.
 - The M1 elevation probe is committed in `6ee788d`: it has a fixed action allow-list, per-operation Windows `runas` launcher, cancellation and timeout states, and a UI control. Docker verification, Windows cross-build, and a hidden process-start smoke test passed. On 2026-08-11 the user exercised the visible UI and observed the no-op probe reach `Succeeded`; it still has no cleanup provider or arbitrary shell-command channel.
 - The root `PROPOSAL.md`, which was an already staged newly added file, was removed after byte-identical preservation in this pack.
-- Product decisions are approved direction, not runtime proof. Implemented evidence includes the M1 fixture/elevation, all bounded M2 provider slices, M3.3 read-only Docker ownership presentation, and M3.5 exact Compose custom-network removal. M3.5 is limited to one canonically labeled network with a fresh complete ownership snapshot, zero available attachment IDs, a backend-retained exact ID, explicit Review confirmation, immediate identity/label/attachment revalidation, exact-ID absence verification, refreshed awareness, and an outcome whose reclaimed bytes remain unavailable. Images, containers, BuildKit, volumes, blanket prune, WSL/VHDX mutation, packaging, and release behaviour remain blocked or planned as recorded in the roadmap.
+- Product decisions are approved direction, not runtime proof. Implemented evidence includes the M1 fixture/elevation, all bounded M2 provider slices, M3.3 read-only Docker ownership presentation, M3.5 exact Compose custom-network removal, and M3.6 read-only WSL/VHDX discovery. M3.6 requires complete exact registration identity plus affirmative WSL 2 evidence and reports only handle allocation bytes as physical measurement; logical usage and compactability remain unavailable. Images, containers, BuildKit, volumes, blanket prune, WSL/VHDX mutation, packaging, and release behaviour remain blocked or planned as recorded in the roadmap.
 - Docker-only verification and Windows cross-build pass through Compose. The generated Windows executable launched successfully for five seconds on the host in a hidden smoke test, then was stopped; this is process-start evidence, not interactive UI acceptance.
 - The fixture lifecycle scans, plans, requires confirmation, executes only an in-memory change, verifies exact reclaimed bytes, and persists a history record. It is not an implementation of any real cleanup provider or command.
 - Commit `d0bc468` upgrades the no-op elevation request to contract version 2 and activates its bounded 30-second execution window only after the Windows launcher returns successfully. The helper waits for that activation, so operator consent time no longer consumes execution time; repeated regression tests cover slow consent, timeout after consent, refusal mapping, cancellation, and allow-list validation. Docker `verify` and `build` passed and produced `out/penguinspace.exe` (13,556,736 bytes; SHA-256 `f606c7a33c6ee13856db965cea2193c2e43197018fee30b6bbf078921125c4f1`). On the Windows host with UAC set to Never notify, the rebuilt executable reached `Succeeded`, `Cancelled`, and `Timed-Out`; its visible fixture lifecycle completed 3.00 MiB through scan, plan, backend confirmation, no-filesystem execution, and verification. Interactive refusal remains unverified because this host configuration auto-approves `runas` without presenting a rejectable prompt.
@@ -90,7 +90,17 @@ It is not a generic PC cleaner or merely a GUI for cache-clearing commands. Its 
 - SQLite history schema version 2 stores reclaimed measurement kind, migrates version-1 records to `measured-logical`, and refuses newer schema versions without downgrade. A verified network outcome records provider `docker.network` with unavailable reclaimed bytes.
 - Vue exposes **Review exact removal** only for an eligible network, shows the retained project/network/ID boundary and no-byte claim, and requires a second explicit confirmation. Results remain visible even if the refreshed daemon is unavailable. Images, containers, BuildKit, volumes, force, prune, bulk removal, and user-supplied commands remain absent.
 - Final `docker compose run --rm verify` passed binding generation (14 methods, 7 enums, 27 models), Vue type-check/build, gofmt, vet, all internal tests, and Windows production cross-build. Deterministic fake-runner tests cover incomplete identity sets, missing attachment metadata, changed attachments, wrong/unconfirmed/consumed plans, exact commands, absence failure, mutate-then-error reconciliation with available/unavailable daemons, history failure, and prohibited force/prune commands. Final semantic review reported no Critical, High, or Medium issue.
-- No existing Docker resource was removed and no reclaimed-byte or live Windows UI claim is made. The next ready phase is M3.6 read-only WSL distro/VHDX discovery; shutdown, elevation, mount, optimize, compact, or any WSL/VHDX mutation remains unauthorized.
+- No existing Docker resource was removed and no reclaimed-byte or live Windows UI claim is made. M3.5 is complete; shutdown, elevation, mount, optimize, compact, or any WSL/VHDX mutation remains unauthorized.
+
+## Save checkpoint — M3.6 read-only WSL/VHDX discovery
+
+**Code reference:** this M3.6 phase commit.
+
+- `internal/wslinventory` performs three fixed list-only WSL calls and correlates exact CLI identities with complete current-user registration metadata. Any registry read error, duplicate identity, case mismatch, malformed encoding, missing affirmative WSL 2 version, or unsafe path disables VHDX measurement.
+- On Windows, the candidate is opened without following a reparse point. Handle attributes reject reparse points/directories, and `FILE_STANDARD_INFO.AllocationSize` supplies the only physical-byte claim; EOF, distro logical usage, compactability, and reclaimable bytes remain unavailable.
+- The Containers & WSL surface is observation-only. It displays a physical size only when path evidence is available and the measurement kind is exactly `measured-physical`; mismatched or unavailable measurements display **Unavailable**. There is no WSL or VHDX action control.
+- Windows-native sparse-allocation and reparse tests passed. The final Docker gate passed 15 service methods, 8 enums, 30 models, Vue type-check/build, formatting, vet, internal tests, and Windows production cross-build. Final semantic review found no Critical, High, or Medium issue.
+- No installed distribution or VHDX was mutated. Live installed-WSL layout/access and Windows visual behavior remain unverified; M4 project-storage phase refinement is the next implementation action.
 
 ## Storage model
 

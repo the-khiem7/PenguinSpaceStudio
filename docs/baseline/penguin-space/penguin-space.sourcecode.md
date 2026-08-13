@@ -4,7 +4,7 @@ pack: "penguin-space"
 document: "sourcecode"
 status: "active"
 updated: "2026-08-14"
-code_ref: "HEAD (M3.5 exact Compose network removal)"
+code_ref: "HEAD (M3.6 read-only WSL/VHDX discovery)"
 ---
 
 # Architecture and implementation
@@ -104,7 +104,19 @@ Final Compose verification regenerated 12-method/25-model bindings, passed Vue t
 
 Deterministic fake-runner tests cover incomplete and mismatched inspect identity sets, absent attachment metadata, action-time attachment changes, confirmation/plan retention, exact command arguments, post-command absence checks, available/unavailable-daemon reconciliation after mutate-then-error, history failure, and prohibition of force/prune. Full Compose verification passed 14 service methods, 7 enums, 27 models, Vue type-check/build, formatting, vet, all internal tests, and Windows cross-build. No existing Docker network was used or removed.
 
-M3.6 is the next ready phase and may only enumerate WSL distributions and discover backing VHDX metadata. Shutdown, elevation, mount, optimize, compact, logical-cleanup, and physical-reclaim execution remain unauthorized.
+## M3.6 read-only WSL/VHDX discovery
+
+`internal/wslinventory.Inspector` owns three fixed commands: `wsl.exe --list --quiet`, `--list --running --quiet`, and `--list --verbose`. `common.SystemRunner.RunRaw` preserves command bytes so WSL-specific decoding can strictly accept UTF-8, BOM-tagged UTF-16LE/BE, and only unambiguous alternating-NUL BOM-less UTF-16. Odd lengths, malformed surrogates, ambiguous encodings, duplicate quiet/running/verbose identities, and command diagnostics fail closed instead of being repaired or case-folded.
+
+Current-user registration discovery reads paired `DistributionName` and `BasePath` values under the WSL `Lxss` key. Any enumeration, open, value-read, close, or context error discards every registry result for that inspection. CLI-to-registry correlation is exact-case; duplicate identities enter a permanent ambiguity set. Allocation lookup additionally requires affirmative unambiguous WSL 2 version evidence. No package-name inference, filesystem scan, prefix match, or guessed path can authorize `ext4.vhdx`.
+
+The Windows allocation adapter opens the exact candidate with `FILE_READ_ATTRIBUTES`, shared read/write/delete access, and `FILE_FLAG_OPEN_REPARSE_POINT`. `FileAttributeTagInfo` rejects reparse points and directories; `FileStandardInfo.AllocationSize` supplies `measured-physical`. `EndOfFile` is retained only to prove in tests that logical EOF is not surfaced as host allocation. Logical distro usage and compactable bytes always remain `unavailable`. A non-Windows adapter cannot measure VHDX allocation.
+
+`AppService.InspectWSLAwareness` exposes this bounded report to Vue. The frontend uses a closed `MeasurementKind` union and displays physical bytes only when `pathAvailable` is true and the kind is exactly `measured-physical`; mismatched, unknown, logical, and compactable values display **Unavailable**. There is no plan, confirmation, elevation, cleanup, shutdown, terminate, mount, manage, sparse, optimize, compact, import/export, unregister, or arbitrary argument endpoint.
+
+Tests cover partial registry rejection, exact-case mismatch, permanent two/three-plus ambiguity, duplicate verbose rows, strict CJK/surrogate/BOM/BOM-less decoding, malformed output, raw UTF-16 diagnostics, command prohibition, and allocation-size-versus-EOF behavior. Windows-native tests create a sparse file to prove `AllocationSize < EndOfFile` and a symlink to prove real reparse rejection. Final Compose verification passed 15 methods, 8 enums, 30 models, Vue type-check/build, formatting, vet, all internal tests, and Windows production cross-build; final semantic review found no Critical, High, or Medium issue. Installed-distribution layout and Windows visual behavior remain unverified.
+
+M3.6 is implemented. M4 project storage is the next implementation milestone after its broad scope is refined into fixture-bounded discovery/scanner phases; all WSL/VHDX mutation remains separately unauthorized.
 
 ## Required core models
 

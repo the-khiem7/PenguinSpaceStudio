@@ -4,7 +4,7 @@ pack: "penguin-space"
 document: "useguide"
 status: "draft"
 updated: "2026-08-14"
-code_ref: "HEAD (M3.5 exact Compose network removal)"
+code_ref: "HEAD (M3.6 read-only WSL/VHDX discovery)"
 ---
 
 # Intended product interaction contract
@@ -53,7 +53,13 @@ An eligible custom network row shows **Review exact removal** only when the late
 
 Only a verified exact-ID absence is a successful network removal. No byte reclaim is displayed because Docker network removal has no meaningful storage-byte claim. A CLI error may still be reconciled as verified if the independent exact-ID check proves the network absent; the warning remains visible. Images, containers, BuildKit, volumes, multi-selection, force, system/builder prune, and frontend-supplied Docker arguments have no removal controls. No existing Docker resource was removed during automated verification; the phase uses deterministic fake-runner fixtures.
 
-M3.6 WSL distribution and VHDX information remains observation-only.
+## M3.6 read-only WSL/VHDX awareness
+
+**Refresh WSL** clears stale WSL observations and runs only backend-owned list and metadata inspection. Each distribution card shows its exact reported name, running/stopped/unknown state, and WSL version only when those fields are unambiguous. Registry, CLI, encoding, version, or file-access uncertainty appears as a warning and leaves the affected value unavailable rather than inferred.
+
+A physical VHDX size appears only for an exact, unambiguous WSL 2 identity whose paired current-user registration supplies an absolute base path and whose exact `ext4.vhdx` can be opened as a regular non-reparse file. The displayed value is allocated Windows host bytes, not logical EOF. **Logical usage** and **Compactable** remain **Unavailable** in M3.6. A path or unknown/mismatched measurement kind cannot make the UI display bytes.
+
+The surface is marked **Observation only** and has no action beyond refresh. It cannot start or stop a distribution, run Linux `df`, launch elevation, mount/unmount a disk, change sparse mode, optimize, compact, import/export, unregister, or claim reclaimed storage. Windows-native sparse and reparse fixtures plus the full Docker gate verify implementation behavior; installed-distribution layout and visual acceptance remain open, so the UI must not describe them as runtime-confirmed.
 
 ## Scan-to-clean flow
 

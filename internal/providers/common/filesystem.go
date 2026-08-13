@@ -17,6 +17,11 @@ type CommandRunner interface {
 	Run(ctx context.Context, executable string, arguments ...string) (string, error)
 }
 
+type RawCommandRunner interface {
+	LookPath(name string) (string, error)
+	RunRaw(ctx context.Context, executable string, arguments ...string) ([]byte, error)
+}
+
 type SystemRunner struct{}
 
 type EnvironmentCommandRunner interface {
@@ -29,20 +34,29 @@ func (SystemRunner) LookPath(name string) (string, error) {
 }
 
 func (SystemRunner) Run(ctx context.Context, executable string, arguments ...string) (string, error) {
-	return runCommand(ctx, executable, nil, arguments...)
+	output, err := runCommandRaw(ctx, executable, nil, arguments...)
+	return formatCommandOutput(output, err)
+}
+
+func (SystemRunner) RunRaw(ctx context.Context, executable string, arguments ...string) ([]byte, error) {
+	return runCommandRaw(ctx, executable, nil, arguments...)
 }
 
 func (SystemRunner) RunWithEnv(ctx context.Context, executable string, environment []string, arguments ...string) (string, error) {
-	return runCommand(ctx, executable, environment, arguments...)
+	output, err := runCommandRaw(ctx, executable, environment, arguments...)
+	return formatCommandOutput(output, err)
 }
 
-func runCommand(ctx context.Context, executable string, environment []string, arguments ...string) (string, error) {
+func runCommandRaw(ctx context.Context, executable string, environment []string, arguments ...string) ([]byte, error) {
 	command := exec.CommandContext(ctx, executable, arguments...)
 	if len(environment) > 0 {
 		command.Env = append(os.Environ(), environment...)
 	}
 	configureCommand(command)
-	output, err := command.CombinedOutput()
+	return command.CombinedOutput()
+}
+
+func formatCommandOutput(output []byte, err error) (string, error) {
 	if err != nil {
 		message := strings.TrimSpace(string(output))
 		if message == "" {

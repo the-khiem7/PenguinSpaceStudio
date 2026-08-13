@@ -267,6 +267,41 @@ type DockerNetworkRemovalOutcome struct {
 	Awareness               DockerAwareness `json:"awareness"`
 }
 
+type WSLDistributionState string
+
+const (
+	WSLStateRunning WSLDistributionState = "running"
+	WSLStateStopped WSLDistributionState = "stopped"
+	WSLStateUnknown WSLDistributionState = "unknown"
+)
+
+type WSLVHDXObservation struct {
+	Path          string      `json:"path,omitempty"`
+	PathAvailable bool        `json:"pathAvailable"`
+	PhysicalSize  Measurement `json:"physicalSize"`
+	LogicalUsage  Measurement `json:"logicalUsage"`
+	Compactable   Measurement `json:"compactable"`
+	Message       string      `json:"message"`
+}
+
+type WSLDistribution struct {
+	Name             string               `json:"name"`
+	State            WSLDistributionState `json:"state"`
+	Version          uint32               `json:"version"`
+	VersionAvailable bool                 `json:"versionAvailable"`
+	VHDX             WSLVHDXObservation   `json:"vhdx"`
+}
+
+type WSLAwareness struct {
+	CLIAvailable   bool              `json:"cliAvailable"`
+	Available      bool              `json:"available"`
+	ExecutablePath string            `json:"executablePath,omitempty"`
+	InspectedAt    time.Time         `json:"inspectedAt"`
+	Distributions  []WSLDistribution `json:"distributions"`
+	Warnings       []string          `json:"warnings"`
+	Message        string            `json:"message"`
+}
+
 type Dashboard struct {
 	ApplicationName string `json:"applicationName"`
 	Stage           string `json:"stage"`

@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref } from "vue";
-import { backend, ElevationProbeMode, type DockerAwareness, type DockerNetworkRemovalOutcome, type DockerNetworkRemovalPlan, type DockerScopedResource, type ElevationStatus, type ProviderAvailability, type Scenario } from "./backend";
+import { backend, ElevationProbeMode, type DockerAwareness, type DockerNetworkRemovalOutcome, type DockerNetworkRemovalPlan, type DockerScopedResource, type ElevationStatus, type Measurement, type MeasurementKind, type ProviderAvailability, type Scenario, type WSLAwareness } from "./backend";
 import ProviderCard from "./components/ProviderCard.vue";
 
 type ProviderDefinition = {
@@ -46,6 +46,9 @@ const dockerNetworkPlan = ref<DockerNetworkRemovalPlan | null>(null);
 const dockerNetworkOutcome = ref<DockerNetworkRemovalOutcome | null>(null);
 const dockerNetworkReviewingID = ref("");
 const dockerNetworkRemoving = ref(false);
+const wslAwareness = ref<WSLAwareness | null>(null);
+const wslLoading = ref(false);
+const wslError = ref("");
 let elevationPoller: ReturnType<typeof setInterval> | undefined;
 
 const reclaimed = computed(() => scenario.value?.verification.reclaimedActual.bytes ?? 0);
@@ -84,6 +87,7 @@ onMounted(async () => {
   }
   await refreshDeveloperProviders();
   await refreshDockerAwareness();
+  await refreshWSLAwareness();
   elevationPoller = setInterval(async () => {
     const status = await backend.elevationStatus();
     if (status.id) elevation.value = status;
@@ -118,6 +122,19 @@ async function refreshDockerAwareness() {
     dockerError.value = `Docker awareness failed: ${String(cause)}`;
   } finally {
     dockerLoading.value = false;
+  }
+}
+
+async function refreshWSLAwareness() {
+  wslLoading.value = true;
+  wslError.value = "";
+  wslAwareness.value = null;
+  try {
+    wslAwareness.value = await backend.inspectWSLAwareness();
+  } catch (cause) {
+    wslError.value = `WSL awareness failed: ${String(cause)}`;
+  } finally {
+    wslLoading.value = false;
   }
 }
 
@@ -161,12 +178,17 @@ async function executeDockerNetworkRemoval() {
   }
 }
 
-function formatBytes(bytes: number, kind: string) {
-  if (kind === "unavailable") return "Not reported";
+function formatBytes(bytes: number) {
+  if (!Number.isFinite(bytes) || bytes < 0) return "Unavailable";
   if (bytes === 0) return "0 B";
   const units = ["B", "KiB", "MiB", "GiB", "TiB"];
   const exponent = Math.min(Math.floor(Math.log(bytes) / Math.log(1024)), units.length - 1);
   return `${(bytes / 1024 ** exponent).toLocaleString(undefined, { maximumSignificantDigits: 3 })} ${units[exponent]}`;
+}
+
+function formatWSLMeasurement(measurement: Measurement, expectedKind: MeasurementKind, evidenceAvailable = true) {
+  if (!evidenceAvailable || expectedKind === "unavailable" || measurement.kind !== expectedKind) return "Unavailable";
+  return formatBytes(measurement.bytes);
 }
 
 function compactDockerID(id: string) {
@@ -471,6 +493,57 @@ function availabilityMessage(providerID: string) {
 
           <ul v-if="dockerAwareness.warnings?.length" class="docker-warnings">
             <li v-for="warning in dockerAwareness.warnings" :key="warning">{{ warning }}</li>
+          </ul>
+        </div>
+      </section>
+
+      <section id="wsl-discovery" class="provider-category wsl-awareness" aria-labelledby="wsl-awareness-title">
+        <div class="provider-category-heading">
+          <div>
+            <p class="eyebrow">M3.6 · Read-only discovery</p>
+            <h2 id="wsl-awareness-title">WSL distributions and backing VHDX files</h2>
+            <p class="muted">Lists registered distributions and measures only the physical host-file size of an evidence-backed ext4.vhdx path. Logical usage and compactable bytes remain unavailable.</p>
+          </div>
+          <button class="secondary" :disabled="wslLoading" @click="refreshWSLAwareness">{{ wslLoading ? "Inspecting…" : "Refresh WSL" }}</button>
+        </div>
+        <p v-if="wslError" class="error" role="alert">{{ wslError }}</p>
+        <p v-else-if="wslLoading && !wslAwareness" class="muted provider-loading">Checking WSL registrations, state, version, and backing-disk metadata…</p>
+        <div v-else-if="wslAwareness" class="wsl-status">
+          <article class="panel wsl-summary" :class="{ available: wslAwareness.available }">
+            <div>
+              <span class="status"><i></i>{{ wslAwareness.available ? "WSL available" : "WSL unavailable" }}</span>
+              <strong>{{ wslAwareness.available ? `${wslAwareness.distributions.length} registered distributions` : "No WSL metadata inspected" }}</strong>
+            </div>
+            <small>{{ wslAwareness.message }}</small>
+          </article>
+
+          <p v-if="wslAwareness.available && wslAwareness.distributions.length === 0" class="empty-state">No registered WSL distributions were reported.</p>
+          <div v-else-if="wslAwareness.distributions.length" class="wsl-distribution-grid">
+            <article v-for="distribution in wslAwareness.distributions" :key="distribution.name" class="panel wsl-distribution">
+              <header>
+                <div>
+                  <span>{{ distribution.state }}</span>
+                  <h3>{{ distribution.name }}</h3>
+                </div>
+                <span class="readonly-tag">Observation only</span>
+              </header>
+              <div class="wsl-metrics">
+                <span><small>WSL version</small><b>{{ distribution.versionAvailable ? distribution.version : "—" }}</b></span>
+                <span><small>Physical VHDX size</small><b>{{ formatWSLMeasurement(distribution.vhdx.physicalSize, "measured-physical", distribution.vhdx.pathAvailable) }}</b></span>
+                <span><small>Logical usage</small><b>{{ formatWSLMeasurement(distribution.vhdx.logicalUsage, "unavailable") }}</b></span>
+                <span><small>Compactable</small><b>{{ formatWSLMeasurement(distribution.vhdx.compactable, "unavailable") }}</b></span>
+              </div>
+              <code v-if="distribution.vhdx.path" :title="distribution.vhdx.path">{{ distribution.vhdx.path }}</code>
+              <p>{{ distribution.vhdx.message }}</p>
+            </article>
+          </div>
+
+          <article class="panel wsl-boundary">
+            <strong>No mutation path</strong>
+            <p>PenguinSpace does not start or stop a distribution, run Linux commands, mount a disk, change sparse mode, optimize, compact, or claim physical reclaim in M3.6.</p>
+          </article>
+          <ul v-if="wslAwareness.warnings?.length" class="docker-warnings">
+            <li v-for="warning in wslAwareness.warnings" :key="warning">{{ warning }}</li>
           </ul>
         </div>
       </section>

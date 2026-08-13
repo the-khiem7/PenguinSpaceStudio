@@ -3,6 +3,9 @@ import { ProbeMode } from "../bindings/github.com/the-khiem7/PenguinSpaceStudio/
 
 export { ProbeMode as ElevationProbeMode };
 
+export type MeasurementKind = "measured-logical" | "estimated-logical" | "measured-physical" | "unavailable";
+export type Measurement = { bytes: number; kind: MeasurementKind };
+
 export type Scenario = {
   scan: { providerId: string; items: Array<{ name: string; measured: { bytes: number } }> };
   plan: { actions: Array<{ risk: string; recoveryCost: string; consequence: string; estimated: { bytes: number } }> };
@@ -162,6 +165,29 @@ export type DockerNetworkRemovalOutcome = {
   awareness: DockerAwareness;
 };
 
+export type WSLAwareness = {
+  cliAvailable: boolean;
+  available: boolean;
+  executablePath?: string;
+  inspectedAt: string;
+  distributions: Array<{
+    name: string;
+    state: "running" | "stopped" | "unknown";
+    version: number;
+    versionAvailable: boolean;
+    vhdx: {
+      path?: string;
+      pathAvailable: boolean;
+      physicalSize: Measurement;
+      logicalUsage: Measurement;
+      compactable: Measurement;
+      message: string;
+    };
+  }>;
+  warnings: string[] | null;
+  message: string;
+};
+
 export const backend = {
   dashboard: () => AppService.Dashboard(),
   runFixtureScenario: (): Promise<Scenario> => AppService.RunFixtureScenario() as Promise<Scenario>,
@@ -170,6 +196,7 @@ export const backend = {
   elevationStatus: (): Promise<ElevationStatus> => AppService.ElevationStatus() as Promise<ElevationStatus>,
   recentHistory: () => AppService.RecentHistory(),
   inspectDockerAwareness: (): Promise<DockerAwareness> => AppService.InspectDockerAwareness() as Promise<DockerAwareness>,
+  inspectWSLAwareness: (): Promise<WSLAwareness> => AppService.InspectWSLAwareness() as Promise<WSLAwareness>,
   inspectDockerNetworkRemoval: (networkId: string): Promise<DockerNetworkRemovalPlan> => AppService.InspectDockerNetworkRemoval(networkId) as Promise<DockerNetworkRemovalPlan>,
   executeDockerNetworkRemoval: (planId: string): Promise<DockerNetworkRemovalOutcome> => AppService.ExecuteDockerNetworkRemoval(planId, true) as Promise<DockerNetworkRemovalOutcome>,
   setWorkspaceRoot: (path: string): Promise<WorkspaceRoot> => AppService.SetWorkspaceRoot(path) as Promise<WorkspaceRoot>,

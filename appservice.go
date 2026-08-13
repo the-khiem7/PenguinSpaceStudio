@@ -24,6 +24,7 @@ import (
 	pnpmprovider "github.com/the-khiem7/PenguinSpaceStudio/internal/providers/pnpm"
 	uvprovider "github.com/the-khiem7/PenguinSpaceStudio/internal/providers/uv"
 	yarnprovider "github.com/the-khiem7/PenguinSpaceStudio/internal/providers/yarn"
+	wslinventory "github.com/the-khiem7/PenguinSpaceStudio/internal/wslinventory"
 )
 
 type issuedProviderPlan struct {
@@ -38,6 +39,7 @@ type AppService struct {
 	dockerInspector *dockerinventory.Inspector
 	dockerMu        sync.Mutex
 	dockerRemoval   *dockerinventory.NetworkRemovalController
+	wslInspector    *wslinventory.Inspector
 	providerMu      sync.Mutex
 	providers       map[string]core.Provider
 	providerOrder   []string
@@ -62,6 +64,7 @@ func NewAppService() (*AppService, error) {
 		history:         store,
 		elevation:       elevation.NewController(elevationStore, newElevationLauncher(), 30*time.Second),
 		dockerInspector: dockerinventory.NewSystemInspector(),
+		wslInspector:    wslinventory.NewSystemInspector(),
 		providers: map[string]core.Provider{
 			bunprovider.ProviderID:        bunprovider.NewSystemProvider(),
 			cargoprovider.ProviderID:      cargoprovider.NewSystemProvider(),
@@ -99,8 +102,8 @@ func (s *AppService) Close() error {
 func (s *AppService) Dashboard() core.Dashboard {
 	return core.Dashboard{
 		ApplicationName: "PenguinSpace",
-		Stage:           "M3.5 exact Compose network removal",
-		SafetyMessage:   "Only one reviewed, unattached Compose network can be removed by exact ID; prune and force remain unavailable.",
+		Stage:           "M3.6 read-only WSL and VHDX discovery",
+		SafetyMessage:   "WSL distributions and backing VHDX size are observation-only; shutdown, mount, optimize, compact, and reclaim actions remain unavailable.",
 	}
 }
 
