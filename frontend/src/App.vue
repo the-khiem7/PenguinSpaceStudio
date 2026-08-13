@@ -94,6 +94,10 @@ async function saveWorkspaceRoot() {
   }
 }
 
+function focusWorkspaceScope() {
+  document.getElementById("workspace-scope")?.scrollIntoView({ behavior: "smooth", block: "center" });
+}
+
 function recordProviderDetection(payload: { providerId: string; label: string; detected: boolean }) {
   const next = { ...detectedDeveloperProviders.value };
   if (payload.detected) next[payload.providerId] = payload.label;
@@ -180,7 +184,7 @@ function recordProviderDetection(payload: { providerId: string; label: string; d
         </aside>
       </section>
 
-      <section class="panel workspace-scope" aria-labelledby="workspace-scope-title">
+      <section id="workspace-scope" class="panel workspace-scope" aria-labelledby="workspace-scope-title">
         <div class="panel-heading">
           <div>
             <p class="eyebrow">Project-scoped cleanup prerequisite</p>
@@ -258,6 +262,9 @@ function recordProviderDetection(payload: { providerId: string; label: string; d
           title="Cargo workspace target"
           inspect-label="Inspect Cargo target"
           description="Requires the approved workspace to contain Cargo.toml. Cleans only its target output; Cargo home storage is excluded."
+          :requires-workspace="true"
+          :workspace-ready="Boolean(workspaceRoot)"
+          @workspace-required="focusWorkspaceScope"
           @detection="recordProviderDetection"
         />
         <ProviderCard
@@ -266,6 +273,9 @@ function recordProviderDetection(payload: { providerId: string; label: string; d
           title="Gradle root build output"
           inspect-label="Inspect Gradle build"
           description="Requires a regular Gradle wrapper and root build/settings file. Runs only the root clean task; Gradle User Home is excluded."
+          :requires-workspace="true"
+          :workspace-ready="Boolean(workspaceRoot)"
+          @workspace-required="focusWorkspaceScope"
           @detection="recordProviderDetection"
         />
         <ProviderCard
@@ -274,6 +284,9 @@ function recordProviderDetection(payload: { providerId: string; label: string; d
           title="Maven workspace target"
           inspect-label="Inspect Maven target"
           description="Requires pom.xml in the approved workspace and runs only Maven clean. The shared local repository is excluded."
+          :requires-workspace="true"
+          :workspace-ready="Boolean(workspaceRoot)"
+          @workspace-required="focusWorkspaceScope"
           @detection="recordProviderDetection"
         />
         <ProviderCard
@@ -282,6 +295,9 @@ function recordProviderDetection(payload: { providerId: string; label: string; d
           title="Playwright hermetic browsers"
           inspect-label="Inspect local Playwright browsers"
           description="Supports only browsers installed hermetically inside this workspace. Shared browser cache and --all removal are excluded."
+          :requires-workspace="true"
+          :workspace-ready="Boolean(workspaceRoot)"
+          @workspace-required="focusWorkspaceScope"
           @detection="recordProviderDetection"
         />
       </section>

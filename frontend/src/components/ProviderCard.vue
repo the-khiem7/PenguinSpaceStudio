@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref } from "vue";
+import { computed, nextTick, ref } from "vue";
 import { backend, type ProviderCleanupOutcome, type ProviderInspection } from "../backend";
 
 const props = defineProps<{
@@ -8,10 +8,13 @@ const props = defineProps<{
   title: string;
   inspectLabel: string;
   description: string;
+  requiresWorkspace?: boolean;
+  workspaceReady?: boolean;
 }>();
 
 const emit = defineEmits<{
   detection: [payload: { providerId: string; label: string; detected: boolean }];
+  workspaceRequired: [];
 }>();
 
 const inspection = ref<ProviderInspection | null>(null);
@@ -20,8 +23,9 @@ const reviewing = ref(false);
 const cleaning = ref(false);
 const outcome = ref<ProviderCleanupOutcome | null>(null);
 const error = ref("");
-const item = computed(() => inspection.value?.scan.items[0]);
-const action = computed(() => inspection.value?.plan.actions[0]);
+const card = ref<HTMLElement | null>(null);
+const item = computed(() => inspection.value?.scan?.items?.[0]);
+const action = computed(() => inspection.value?.plan?.actions?.[0]);
 const formattedBytes = computed(() => formatBytes(item.value?.measured.bytes ?? 0));
 
 async function inspectProvider() {
@@ -36,6 +40,8 @@ async function inspectProvider() {
     error.value = `${props.providerLabel} inspection failed: ${String(cause)}`;
   } finally {
     inspecting.value = false;
+    await nextTick();
+    card.value?.scrollIntoView({ block: "nearest" });
   }
 }
 
@@ -63,15 +69,17 @@ function formatBytes(bytes: number) {
 </script>
 
 <template>
-  <section class="panel provider-panel" :aria-labelledby="`${providerId}-title`">
+  <section ref="card" class="panel provider-panel" :aria-labelledby="`${providerId}-title`">
     <div class="panel-heading">
       <div>
         <p class="eyebrow">M2 provider slice</p>
         <h2 :id="`${providerId}-title`">{{ title }}</h2>
       </div>
-      <button :disabled="inspecting" @click="inspectProvider">{{ inspecting ? "Inspecting…" : inspectLabel }}</button>
+      <button v-if="requiresWorkspace && !workspaceReady" @click="emit('workspaceRequired')">Choose workspace root</button>
+      <button v-else :disabled="inspecting" @click="inspectProvider">{{ inspecting ? "Inspecting…" : inspectLabel }}</button>
     </div>
     <p class="muted">{{ description }}</p>
+    <p v-if="requiresWorkspace && !workspaceReady" class="muted">Select and validate an approved workspace root before this provider can inspect anything.</p>
     <div v-if="inspection" class="provider-result">
       <article>
         <span>Detection</span>
