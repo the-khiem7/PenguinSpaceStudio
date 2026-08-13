@@ -66,7 +66,7 @@ func (p *Provider) Detect(ctx context.Context) (core.ProviderDetection, error) {
 	if !explicitStore {
 		message = "pnpm is supported by version, but no explicit storeDir is configured. Default pnpm stores are per disk, so discovery is deferred until project roots provide drive context; no prune plan will be created."
 	}
-	return core.ProviderDetection{ProviderID: ProviderID, Detected: true, Supported: supported, Version: version, ExecutablePath: executable, Message: message}, nil
+	return core.ProviderDetection{ProviderID: ProviderID, Detected: true, Supported: supported, NeedsConfiguration: !explicitStore, Version: version, ExecutablePath: executable, Message: message}, nil
 }
 
 func (p *Provider) Scan(ctx context.Context, detection core.ProviderDetection) (core.ScanResult, error) {

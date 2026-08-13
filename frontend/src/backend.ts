@@ -23,6 +23,7 @@ export type ProviderInspection = {
     providerId: string;
     detected: boolean;
     supported: boolean;
+    needsConfiguration: boolean;
     version?: string;
     executablePath?: string;
     message: string;
@@ -51,6 +52,22 @@ export type ProviderInspection = {
   executionEnabled: boolean;
 };
 
+export type ProviderAvailability = {
+  providerId: string;
+  status: "available" | "needs-configuration" | "unavailable" | "not-applicable" | "workspace-required";
+  workspaceScoped: boolean;
+  detection: {
+    providerId: string;
+    detected: boolean;
+    supported: boolean;
+    needsConfiguration: boolean;
+    version?: string;
+    executablePath?: string;
+    message: string;
+  };
+  message: string;
+};
+
 export type ProviderCleanupOutcome = {
   execution: { planId: string; executed: boolean; destructive: boolean; message: string };
   verification: {
@@ -70,6 +87,7 @@ export const backend = {
   elevationStatus: (): Promise<ElevationStatus> => AppService.ElevationStatus() as Promise<ElevationStatus>,
   recentHistory: () => AppService.RecentHistory(),
   setWorkspaceRoot: (path: string): Promise<WorkspaceRoot> => AppService.SetWorkspaceRoot(path) as Promise<WorkspaceRoot>,
+  discoverDeveloperProviders: (): Promise<ProviderAvailability[]> => AppService.DiscoverDeveloperProviders() as Promise<ProviderAvailability[]>,
   inspectDeveloperProvider: (providerId: string): Promise<ProviderInspection> => AppService.InspectDeveloperProvider(providerId) as Promise<ProviderInspection>,
   executeDeveloperProvider: (providerId: string): Promise<ProviderCleanupOutcome> => AppService.ExecuteDeveloperProvider(providerId, true) as Promise<ProviderCleanupOutcome>,
 };

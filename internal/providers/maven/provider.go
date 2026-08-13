@@ -23,6 +23,7 @@ func NewSystemProvider() core.Provider { return NewProvider(common.SystemRunner{
 func config() projectcleanup.Config {
 	return projectcleanup.Config{
 		ProviderID: ProviderID, ItemID: "maven-workspace-target", ItemName: "Maven workspace target", PlanID: "maven-workspace-clean-plan", ActionID: "maven-workspace-clean",
+		ExecutableName:     "mvn",
 		FindExecutable:     func(_ string, runner common.CommandRunner) (string, error) { return runner.LookPath("mvn") },
 		VersionArguments:   func(string) []string { return []string{"--version"} },
 		CleanupArguments:   func(root string) []string { return []string{"-f", filepath.Join(root, "pom.xml"), "clean"} },

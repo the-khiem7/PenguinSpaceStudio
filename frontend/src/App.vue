@@ -1,7 +1,30 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref } from "vue";
-import { backend, ElevationProbeMode, type ElevationStatus, type Scenario } from "./backend";
+import { backend, ElevationProbeMode, type ElevationStatus, type ProviderAvailability, type Scenario } from "./backend";
 import ProviderCard from "./components/ProviderCard.vue";
+
+type ProviderDefinition = {
+  id: string;
+  label: string;
+  title: string;
+  inspectLabel: string;
+  description: string;
+  workspaceScoped?: boolean;
+};
+
+const providerDefinitions: ProviderDefinition[] = [
+  { id: "bun.global-cache", label: "Bun", title: "Bun global module cache", inspectLabel: "Inspect Bun cache", description: "Version-aware inspection, reviewed cleanup, and post-operation logical measurement. Physical reclaim may be lower because Bun can use hardlinks." },
+  { id: "npm.global-cache", label: "npm", title: "npm managed content cache", inspectLabel: "Inspect npm cache", description: "Measures only npm-managed _cacache content. Logs and npx cache are outside this action; cleanup remains Review because npm requires --force." },
+  { id: "pnpm.global-store", label: "pnpm", title: "pnpm configured store", inspectLabel: "Inspect pnpm store", description: "An explicit storeDir can be measured and pruned; default per-disk stores require project-root context. Pruneable bytes remain unavailable before execution." },
+  { id: "uv.global-cache", label: "uv", title: "uv global cache", inspectLabel: "Inspect uv cache", description: "Prunes unused entries and centralized project environments. Total cache bytes are observable, but reclaimable bytes remain unavailable before execution." },
+  { id: "yarn.classic-global-cache", label: "Yarn Classic", title: "Yarn Classic global cache", inspectLabel: "Inspect Yarn cache", description: "Supports only Yarn Classic 1.x global cache. Modern Yarn's project-local and shared-cache modes remain outside this action." },
+  { id: "nuget.http-cache", label: "NuGet", title: "NuGet HTTP cache", inspectLabel: "Inspect NuGet HTTP cache", description: "Clears only HTTP-request metadata. Global packages, temporary data, and plugin caches are deliberately outside this safe action." },
+  { id: "cypress.binary-cache", label: "Cypress", title: "Cypress binary cache", inspectLabel: "Inspect Cypress cache", description: "Prunes older downloaded Cypress binaries while retaining the binary currently in use. The observed total is not a reclaim estimate." },
+  { id: "cargo.workspace-target", label: "Cargo", title: "Cargo workspace target", inspectLabel: "Inspect Cargo target", description: "Requires Cargo.toml in the approved workspace and a host Cargo installation. Docker-only Cargo toolchains are outside this provider.", workspaceScoped: true },
+  { id: "gradle.workspace-build", label: "Gradle", title: "Gradle root build output", inspectLabel: "Inspect Gradle build", description: "Requires a regular Gradle wrapper and root build/settings file. Gradle User Home is excluded.", workspaceScoped: true },
+  { id: "maven.workspace-target", label: "Maven", title: "Maven workspace target", inspectLabel: "Inspect Maven target", description: "Requires pom.xml in the approved workspace and a host Maven installation. The shared local repository is excluded.", workspaceScoped: true },
+  { id: "playwright.hermetic-browsers", label: "Playwright", title: "Playwright hermetic browsers", inspectLabel: "Inspect local Playwright browsers", description: "Supports only browsers installed hermetically inside this workspace. Shared browser cache and --all removal are excluded.", workspaceScoped: true },
+];
 
 const stage = ref("Connecting to the local service…");
 const safetyMessage = ref("All cleanup requires a reviewed plan.");
@@ -13,7 +36,9 @@ const elevationStarting = ref(false);
 const workspaceRootInput = ref("");
 const workspaceRoot = ref("");
 const workspaceSaving = ref(false);
-const detectedDeveloperProviders = ref<Record<string, string>>({});
+const providerAvailability = ref<ProviderAvailability[]>([]);
+const discoveryLoading = ref(false);
+const discoveryError = ref("");
 let elevationPoller: ReturnType<typeof setInterval> | undefined;
 
 const reclaimed = computed(() => scenario.value?.verification.reclaimedActual.bytes ?? 0);
@@ -22,11 +47,25 @@ const elevationBusy = computed(() =>
   elevationStarting.value ||
   (elevation.value !== null && !["succeeded", "failed", "cancelled", "timed-out"].includes(elevation.value.state)),
 );
-const detectedProviderLabels = computed(() => Object.values(detectedDeveloperProviders.value));
+const availabilityByID = computed(() => new Map(providerAvailability.value.map((entry) => [entry.providerId, entry])));
+const availableProviders = computed(() => providerDefinitions.filter((provider) => availabilityByID.value.get(provider.id)?.status === "available"));
+const providersNeedingConfiguration = computed(() => providerDefinitions.filter((provider) => availabilityByID.value.get(provider.id)?.status === "needs-configuration"));
+const unavailableProviders = computed(() => providerAvailability.value.filter((entry) => entry.status === "unavailable"));
+const detectedProviderLabels = computed(() => providerAvailability.value
+  .filter((entry) => entry.status === "available" || entry.status === "needs-configuration")
+  .map((entry) => definitionFor(entry.providerId)?.label ?? entry.providerId));
 const detectedProviders = computed(() => 1 + detectedProviderLabels.value.length);
-const detectedProviderSummary = computed(() =>
-  detectedProviderLabels.value.length > 0 ? `Fixture + ${detectedProviderLabels.value.join(" + ")}` : "Fixture; inspect providers to detect them",
-);
+const detectedProviderSummary = computed(() => {
+  if (discoveryLoading.value) return "Checking installed developer tools…";
+  return detectedProviderLabels.value.length > 0 ? `Fixture + ${detectedProviderLabels.value.join(" + ")}` : "Fixture; no supported host providers detected";
+});
+const workspaceDiscoverySummary = computed(() => {
+  if (!workspaceRoot.value) return "Choose an approved workspace root to discover project providers."
+  if (discoveryLoading.value) return "Checking project markers and host tools…";
+  const workspaceEntries = providerAvailability.value.filter((entry) => entry.workspaceScoped);
+  if (workspaceEntries.some((entry) => entry.status === "available" || entry.status === "needs-configuration" || entry.status === "unavailable")) return "Matching project providers are shown with the other developer tools.";
+  return "No supported host-based project provider matches this workspace root.";
+});
 
 onMounted(async () => {
   try {
@@ -36,7 +75,7 @@ onMounted(async () => {
   } catch (cause) {
     error.value = `Backend connection failed: ${String(cause)}`;
   }
-
+  await refreshDeveloperProviders();
   elevationPoller = setInterval(async () => {
     const status = await backend.elevationStatus();
     if (status.id) elevation.value = status;
@@ -46,6 +85,18 @@ onMounted(async () => {
 onBeforeUnmount(() => {
   if (elevationPoller) clearInterval(elevationPoller);
 });
+
+async function refreshDeveloperProviders() {
+  discoveryLoading.value = true;
+  discoveryError.value = "";
+  try {
+    providerAvailability.value = await backend.discoverDeveloperProviders();
+  } catch (cause) {
+    discoveryError.value = `Developer tool discovery failed: ${String(cause)}`;
+  } finally {
+    discoveryLoading.value = false;
+  }
+}
 
 async function runFixture() {
   running.value = true;
@@ -87,6 +138,7 @@ async function saveWorkspaceRoot() {
   try {
     const root = await backend.setWorkspaceRoot(workspaceRootInput.value);
     workspaceRoot.value = root.path;
+    await refreshDeveloperProviders();
   } catch (cause) {
     error.value = `Workspace root was not accepted: ${String(cause)}`;
   } finally {
@@ -94,15 +146,13 @@ async function saveWorkspaceRoot() {
   }
 }
 
-function focusWorkspaceScope() {
-  document.getElementById("workspace-scope")?.scrollIntoView({ behavior: "smooth", block: "center" });
+function definitionFor(providerID: string) {
+  return providerDefinitions.find((provider) => provider.id === providerID);
 }
 
-function recordProviderDetection(payload: { providerId: string; label: string; detected: boolean }) {
-  const next = { ...detectedDeveloperProviders.value };
-  if (payload.detected) next[payload.providerId] = payload.label;
-  else delete next[payload.providerId];
-  detectedDeveloperProviders.value = next;
+function availabilityMessage(providerID: string) {
+  const entry = availabilityByID.value.get(providerID);
+  return entry?.message || entry?.detection.message || "Additional configuration is required before this provider can inspect storage.";
 }
 </script>
 
@@ -143,9 +193,7 @@ function recordProviderDetection(payload: { providerId: string; label: string; d
               <p class="eyebrow">M1 vertical slice</p>
               <h2>Fixture cache lifecycle</h2>
             </div>
-            <button :disabled="running" @click="runFixture">
-              {{ running ? "Running…" : "Run safe fixture" }}
-            </button>
+            <button :disabled="running" @click="runFixture">{{ running ? "Running…" : "Run safe fixture" }}</button>
           </div>
           <p class="muted">{{ safetyMessage }}</p>
           <ol class="lifecycle">
@@ -191,115 +239,67 @@ function recordProviderDetection(payload: { providerId: string; label: string; d
             <h2 id="workspace-scope-title">Approved workspace root</h2>
           </div>
         </div>
-        <p class="muted">Cargo, Gradle, Maven, and Playwright only inspect targets inside this one backend-validated directory. Changing it invalidates any reviewed project cleanup plan.</p>
+        <p class="muted">Project providers are discovered only when this backend-validated root has a matching project marker. Host-only providers do not inspect Docker-held toolchains or caches.</p>
         <div class="probe-actions">
           <input v-model="workspaceRootInput" aria-label="Approved workspace root path" placeholder="Absolute project path" type="text" />
           <button :disabled="workspaceSaving || !workspaceRootInput.trim()" @click="saveWorkspaceRoot">{{ workspaceSaving ? "Validating…" : "Use workspace" }}</button>
         </div>
         <p class="muted">{{ workspaceRoot ? `Approved: ${workspaceRoot}` : "No workspace root approved." }}</p>
+        <p class="muted">{{ workspaceDiscoverySummary }}</p>
       </section>
 
-      <section class="provider-stack" id="developer-tools" aria-label="Developer tool providers">
-        <ProviderCard
-          provider-id="bun.global-cache"
-          provider-label="Bun"
-          title="Bun global module cache"
-          inspect-label="Inspect Bun cache"
-          description="Version-aware inspection, reviewed cleanup, and post-operation logical measurement. Physical reclaim may be lower because Bun can use hardlinks."
-          @detection="recordProviderDetection"
-        />
-        <ProviderCard
-          provider-id="npm.global-cache"
-          provider-label="npm"
-          title="npm managed content cache"
-          inspect-label="Inspect npm cache"
-          description="Measures only npm-managed _cacache content. Logs and npx cache are outside this action; cleanup remains Review because npm requires --force."
-          @detection="recordProviderDetection"
-        />
-        <ProviderCard
-          provider-id="pnpm.global-store"
-          provider-label="pnpm"
-          title="pnpm configured store"
-          inspect-label="Inspect pnpm store"
-          description="An explicit storeDir can be measured and pruned; default per-disk stores require project-root context. Pruneable bytes remain unavailable before execution."
-          @detection="recordProviderDetection"
-        />
-        <ProviderCard
-          provider-id="uv.global-cache"
-          provider-label="uv"
-          title="uv global cache"
-          inspect-label="Inspect uv cache"
-          description="Prunes unused entries and centralized project environments. Total cache bytes are observable, but reclaimable bytes remain unavailable before execution."
-          @detection="recordProviderDetection"
-        />
-        <ProviderCard
-          provider-id="yarn.classic-global-cache"
-          provider-label="Yarn Classic"
-          title="Yarn Classic global cache"
-          inspect-label="Inspect Yarn cache"
-          description="Supports only Yarn Classic 1.x global cache. Modern Yarn's project-local and shared-cache modes remain outside this action."
-          @detection="recordProviderDetection"
-        />
-        <ProviderCard
-          provider-id="nuget.http-cache"
-          provider-label="NuGet"
-          title="NuGet HTTP cache"
-          inspect-label="Inspect NuGet HTTP cache"
-          description="Clears only HTTP-request metadata. Global packages, temporary data, and plugin caches are deliberately outside this safe action."
-          @detection="recordProviderDetection"
-        />
-        <ProviderCard
-          provider-id="cypress.binary-cache"
-          provider-label="Cypress"
-          title="Cypress binary cache"
-          inspect-label="Inspect Cypress cache"
-          description="Prunes older downloaded Cypress binaries while retaining the binary currently in use. The observed total is not a reclaim estimate."
-          @detection="recordProviderDetection"
-        />
-        <ProviderCard
-          provider-id="cargo.workspace-target"
-          provider-label="Cargo"
-          title="Cargo workspace target"
-          inspect-label="Inspect Cargo target"
-          description="Requires the approved workspace to contain Cargo.toml. Cleans only its target output; Cargo home storage is excluded."
-          :requires-workspace="true"
-          :workspace-ready="Boolean(workspaceRoot)"
-          @workspace-required="focusWorkspaceScope"
-          @detection="recordProviderDetection"
-        />
-        <ProviderCard
-          provider-id="gradle.workspace-build"
-          provider-label="Gradle"
-          title="Gradle root build output"
-          inspect-label="Inspect Gradle build"
-          description="Requires a regular Gradle wrapper and root build/settings file. Runs only the root clean task; Gradle User Home is excluded."
-          :requires-workspace="true"
-          :workspace-ready="Boolean(workspaceRoot)"
-          @workspace-required="focusWorkspaceScope"
-          @detection="recordProviderDetection"
-        />
-        <ProviderCard
-          provider-id="maven.workspace-target"
-          provider-label="Maven"
-          title="Maven workspace target"
-          inspect-label="Inspect Maven target"
-          description="Requires pom.xml in the approved workspace and runs only Maven clean. The shared local repository is excluded."
-          :requires-workspace="true"
-          :workspace-ready="Boolean(workspaceRoot)"
-          @workspace-required="focusWorkspaceScope"
-          @detection="recordProviderDetection"
-        />
-        <ProviderCard
-          provider-id="playwright.hermetic-browsers"
-          provider-label="Playwright"
-          title="Playwright hermetic browsers"
-          inspect-label="Inspect local Playwright browsers"
-          description="Supports only browsers installed hermetically inside this workspace. Shared browser cache and --all removal are excluded."
-          :requires-workspace="true"
-          :workspace-ready="Boolean(workspaceRoot)"
-          @workspace-required="focusWorkspaceScope"
-          @detection="recordProviderDetection"
-        />
+      <section id="developer-tools" class="provider-category" aria-labelledby="developer-tools-title">
+        <div class="provider-category-heading">
+          <div>
+            <p class="eyebrow">Developer tools</p>
+            <h2 id="developer-tools-title">Available caches</h2>
+            <p class="muted">Discovery checks provider availability only. Storage is measured only after Inspect.</p>
+          </div>
+          <button class="secondary" :disabled="discoveryLoading" @click="refreshDeveloperProviders">{{ discoveryLoading ? "Checking…" : "Refresh detected tools" }}</button>
+        </div>
+        <p v-if="discoveryError" class="error" role="alert">{{ discoveryError }}</p>
+        <p v-else-if="discoveryLoading" class="muted provider-loading">Checking installed developer tools…</p>
+        <p v-else-if="availableProviders.length === 0" class="empty-state">No supported provider is ready to inspect on this host.</p>
+        <div v-else class="provider-stack">
+          <ProviderCard
+            v-for="provider in availableProviders"
+            :key="provider.id"
+            :provider-id="provider.id"
+            :provider-label="provider.label"
+            :title="provider.title"
+            :inspect-label="provider.inspectLabel"
+            :description="provider.description"
+            @inspected="refreshDeveloperProviders"
+          />
+        </div>
+      </section>
+
+      <section v-if="providersNeedingConfiguration.length" class="provider-category" aria-labelledby="needs-configuration-title">
+        <div class="provider-category-heading">
+          <div>
+            <p class="eyebrow">Detected, needs setup</p>
+            <h2 id="needs-configuration-title">Configuration required</h2>
+          </div>
+        </div>
+        <div class="provider-notice-grid">
+          <article v-for="provider in providersNeedingConfiguration" :key="provider.id" class="provider-notice">
+            <strong>{{ provider.title }}</strong>
+            <p>{{ availabilityMessage(provider.id) }}</p>
+          </article>
+        </div>
+      </section>
+
+      <section v-if="unavailableProviders.length" class="provider-category unavailable-providers" aria-label="Unavailable developer tools">
+        <details>
+          <summary>Unavailable on this machine ({{ unavailableProviders.length }})</summary>
+          <p class="muted">These providers are not rendered as cleanup cards because their host tool or supported workspace prerequisite is unavailable.</p>
+          <ul>
+            <li v-for="entry in unavailableProviders" :key="entry.providerId">
+              <strong>{{ definitionFor(entry.providerId)?.label ?? entry.providerId }}</strong>
+              <span>{{ entry.message || entry.detection.message }}</span>
+            </li>
+          </ul>
+        </details>
       </section>
     </section>
   </main>

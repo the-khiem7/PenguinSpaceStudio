@@ -4,7 +4,7 @@ pack: "penguin-space"
 document: "roadmap"
 status: "active"
 updated: "2026-08-13"
-code_ref: "163295b"
+code_ref: "working tree (post-163295b)"
 ---
 
 # Product roadmap and verification state
@@ -18,7 +18,7 @@ code_ref: "163295b"
 | Architecture and usage contract | Complete | Source-code and use-guide documents created because the proposal defines both materially |
 | Root proposal deletion | Complete | Root source removed after SHA-256 equality and pack-coverage verification |
 | Phase 0 — Research and decision closure | Complete with scoped deferrals | Nine decisions were resolved or explicitly deferred in the Phase 0 register; Docker-only toolchain spike passed without a host SDK |
-| Product implementation | M1 complete with two scoped environment deferrals; M2 implementation complete pending bounded Windows UI acceptance | Eleven provider lifecycles are implemented: Bun, npm, conditional pnpm, uv, Yarn Classic, NuGet HTTP cache, Cypress binary cache, Cargo workspace target, Gradle root build output, Maven workspace target, and Playwright hermetic local browsers. The final four require a manually approved root and do not create the wider M4 Project storage surface. |
+| Product implementation | M1 complete with two scoped environment deferrals; M2 provider implementation and discovery-first UI complete pending bounded Windows UI acceptance | Eleven provider lifecycles are implemented: Bun, npm, conditional pnpm, uv, Yarn Classic, NuGet HTTP cache, Cypress binary cache, Cargo workspace target, Gradle root build output, Maven workspace target, and Playwright hermetic local browsers. The UI now displays full cards only for supported host providers; the final four still require a manually approved root and do not create the wider M4 Project storage surface. |
 
 ## Phase 0 — Research and decision closure
 
@@ -82,6 +82,8 @@ Implement detection, inspection, estimate, plan, cleanup, and verification for N
 
 **Workspace-scoped provider checkpoint (commit `163295b`, Docker verified 2026-08-13):** The minimal `SetWorkspaceRoot` bridge accepts one manually supplied absolute root, then backend validation rejects filesystem roots, home directory, symlinks, target escapes, and a scope change after review. It stores no project root persistently and provides no project discovery, scanner, filter, or analytics. Cargo 1.70+ uses only `cargo clean --manifest-path <approved>/Cargo.toml` for `<approved>/target`; Gradle 8/9 uses only the root regular wrapper with `:clean` for `<approved>/build`; Maven 3/4 uses only `mvn -f <approved>/pom.xml clean` for `<approved>/target`; and Playwright 1.40+ uses a local regular CLI with `PLAYWRIGHT_BROWSERS_PATH=0 uninstall` for hermetic `node_modules/playwright-core/.local-browsers`. Every slice is Review/Rebuild, requires explicit confirmation, revalidates the scope/target, and records measured logical before/after bytes. Full `docker compose run --rm verify` passed Wails bindings (10 methods/15 models), Vue typecheck/build, gofmt, vet, internal tests, and Windows cross-build. Fixture evidence is complete; Windows interactive acceptance for the four new cards remains required and must cancel review without deleting real data.
 
+**Discovery-first provider checkpoint (working tree, 2026-08-13):** `AppService.DiscoverDeveloperProviders` adds an ordered, bounded Detect-only discovery endpoint. It never scans bytes, issues plans, or runs cleanup. The Vue Developer Tools surface now renders Inspect cards only for supported host providers, puts detected pnpm without an explicit `storeDir` in a compact configuration-required notice, and collapses missing/unsupported host tools into diagnostics. After a workspace root is accepted, Cargo, Gradle, Maven, and Playwright must first match their existing workspace marker validation before becoming candidates; Docker-only toolchains remain intentionally outside the host-provider boundary. The project-cleanup missing-executable messages now distinguish a missing host PATH executable from a missing local wrapper/CLI. `docker compose run --rm verify` passed regenerated Wails bindings (11 methods/16 models), Vue typecheck/build, gofmt, vet, internal tests, and Windows production cross-build. `scripts/build-windows.ps1 -Version 0.1.1` then built `out/penguinspace-v0.1.1.exe` without replacing prior artifacts. Windows visual acceptance is complete: the operator launched `v0.1.1` with no workspace root and supplied screenshots confirming that Bun, npm, uv, and NuGet alone render as full available cards; pnpm is a configuration-required notice; Yarn and Cypress are collapsed unavailable diagnostics; and no project-provider cards are shown before workspace selection.
+
 ## Milestone 3 — Containers and WSL
 
 **Depends on:** Phase 0 Docker/WSL findings; Milestone 1; Docker and Windows/WSL test environments.
@@ -131,11 +133,21 @@ Cover failure recovery, locked files, permission failures, malformed output, par
 | Logical cleanup does not shrink VHDX | Misleading reclaimed-space claim | Separate logical, estimated compactable, and actual physical results |
 | UAC or environment shutdown fails | Cleanup/compaction stops partway | Plan-time privilege/shutdown indication, cancellation and recovery handling |
 | Host toolchain drift or cache pollution | Non-reproducible builds and WSL/Docker storage pressure | Keep all project toolchains and caches in pinned container images or named volumes; do not bind-mount host SDK/cache directories |
-| Only Bun, npm, conditional pnpm, and uv cleanup providers exist | Their evidence may be generalized to unimplemented ecosystems, pnpm/uv total size may be mistaken for reclaimable size, or logical bytes may be presented as physical reclaim | Keep every remaining provider planned until its own evidence exists; retain observed, unavailable-estimate, logical, and physical measurement distinctions |
+| Implemented provider boundaries and discovery availability can be mistaken for Docker/project cache coverage | Docker-only toolchains can appear unavailable; observed tool/cache state may be mistaken for a cleanup plan | Keep full cards limited to supported host providers, retain configuration/unavailable diagnostics, require explicit workspace markers, and defer Docker/BuildKit resource inspection to M3 with its separate safety model |
 
 ## Exact next action
 
-Run Windows interactive acceptance for Cargo, Gradle, Maven, and Playwright with disposable approved workspaces. For each card: set one valid absolute workspace root, inspect and confirm the detected target/size/consequence, open review, cancel, and verify the displayed measurement remains unchanged and no real user project/browser storage is deleted. Then record the result and close M2 acceptance.
+Run Windows interactive acceptance for `out\penguinspace-v0.1.1.exe`. At launch, verify that only supported host providers appear as full Inspect cards, pnpm without an explicit `storeDir` is a configuration notice, and unavailable host tools are collapsed rather than rendered with `—` values. Then choose a disposable approved workspace: verify a project provider appears only when its marker and host prerequisite are available; cancel any review without deleting data. Docker-only Cargo projects must remain outside the host-provider cards. Record the visual evidence before closing the M2 discovery-first acceptance.
+
+## Save checkpoint — 2026-08-13
+
+This checkpoint supersedes the earlier **Exact next action** acceptance instruction below: discovery-first Windows visual acceptance is now complete for `out\penguinspace-v0.1.1.exe`.
+
+- **M2 discovery-first UI:** complete and user-confirmed. Available host providers render as full cards, pnpm without explicit `storeDir` is a configuration notice, unavailable tools are collapsed, and project provider cards remain absent until a matching approved workspace exists.
+- **Build evidence:** `d97fa27`; `docker compose run --rm verify` passed bindings (11 methods/16 models), Vue typecheck/build, gofmt, vet, internal tests, and Windows cross-build. `scripts/build-windows.ps1 -Version 0.1.1` produced `out/penguinspace-v0.1.1.exe` without overwriting prior artifacts.
+- **Boundary confirmed:** IRYS is Docker-first. Its Cargo project/build cache is not observable through the host-only Cargo provider; this is expected behavior, not an M2 detection defect.
+- **Next implementation action:** M3.1 Docker awareness, read-only only. Implement bounded daemon detection and independent inspection of images, stopped containers, BuildKit cache, networks, and volumes. Do not add any cleanup action, broad prune command, or volume mutation in this phase.
+- **Still unverified:** Docker resource ownership and cleanup semantics; BuildKit attribution; volume recovery; UAC refusal; and optional host-native visual acceptance for Cargo/Gradle/Maven/Playwright.
 
 ## Pack migration verification
 

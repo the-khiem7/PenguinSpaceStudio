@@ -8,13 +8,10 @@ const props = defineProps<{
   title: string;
   inspectLabel: string;
   description: string;
-  requiresWorkspace?: boolean;
-  workspaceReady?: boolean;
 }>();
 
 const emit = defineEmits<{
-  detection: [payload: { providerId: string; label: string; detected: boolean }];
-  workspaceRequired: [];
+  inspected: [];
 }>();
 
 const inspection = ref<ProviderInspection | null>(null);
@@ -35,7 +32,7 @@ async function inspectProvider() {
     inspection.value = await backend.inspectDeveloperProvider(props.providerId);
     reviewing.value = false;
     outcome.value = null;
-    emit("detection", { providerId: props.providerId, label: props.providerLabel, detected: inspection.value.detection.detected });
+    emit("inspected");
   } catch (cause) {
     error.value = `${props.providerLabel} inspection failed: ${String(cause)}`;
   } finally {
@@ -75,11 +72,9 @@ function formatBytes(bytes: number) {
         <p class="eyebrow">M2 provider slice</p>
         <h2 :id="`${providerId}-title`">{{ title }}</h2>
       </div>
-      <button v-if="requiresWorkspace && !workspaceReady" @click="emit('workspaceRequired')">Choose workspace root</button>
-      <button v-else :disabled="inspecting" @click="inspectProvider">{{ inspecting ? "Inspecting…" : inspectLabel }}</button>
+      <button :disabled="inspecting" @click="inspectProvider">{{ inspecting ? "Inspecting…" : inspectLabel }}</button>
     </div>
     <p class="muted">{{ description }}</p>
-    <p v-if="requiresWorkspace && !workspaceReady" class="muted">Select and validate an approved workspace root before this provider can inspect anything.</p>
     <div v-if="inspection" class="provider-result">
       <article>
         <span>Detection</span>

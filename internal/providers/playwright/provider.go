@@ -25,6 +25,7 @@ func NewSystemProvider() core.Provider { return NewProvider(common.SystemRunner{
 func config() projectcleanup.Config {
 	return projectcleanup.Config{
 		ProviderID: ProviderID, ItemID: "playwright-hermetic-browsers", ItemName: "Playwright hermetic browsers", PlanID: "playwright-hermetic-uninstall-plan", ActionID: "playwright-hermetic-uninstall",
+		ExecutableName:     "Playwright local CLI",
 		FindExecutable:     findLocalCLI,
 		VersionArguments:   func(string) []string { return []string{"--version"} },
 		CleanupArguments:   func(string) []string { return []string{"uninstall"} },

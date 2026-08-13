@@ -21,6 +21,7 @@ type Arguments func(workspaceRoot string) []string
 
 type Config struct {
 	ProviderID, ItemID, ItemName, PlanID, ActionID         string
+	ExecutableName                                         string
 	FindExecutable                                         FindExecutable
 	VersionArguments, CleanupArguments, CleanupEnvironment Arguments
 	ParseVersion                                           VersionParser
@@ -63,6 +64,14 @@ func (p *Provider) workspace() (string, error) {
 	return common.ValidateWorkspaceRoot(root)
 }
 
+func (p *Provider) WorkspaceApplicable(root string) error {
+	validated, err := common.ValidateWorkspaceRoot(root)
+	if err != nil {
+		return err
+	}
+	return p.config.ValidateWorkspace(validated)
+}
+
 func (p *Provider) Detect(ctx context.Context) (core.ProviderDetection, error) {
 	root, err := p.workspace()
 	if err != nil {
@@ -70,8 +79,11 @@ func (p *Provider) Detect(ctx context.Context) (core.ProviderDetection, error) {
 	}
 	executable, err := p.config.FindExecutable(root, p.runner)
 	if err != nil {
-		if errors.Is(err, exec.ErrNotFound) || errors.Is(err, os.ErrNotExist) {
-			return core.ProviderDetection{ProviderID: p.config.ProviderID, Message: fmt.Sprintf("%s was not found for the approved workspace.", p.config.ItemName)}, nil
+		if errors.Is(err, exec.ErrNotFound) {
+			return core.ProviderDetection{ProviderID: p.config.ProviderID, Message: fmt.Sprintf("%s was not found on PATH.", p.config.ExecutableName)}, nil
+		}
+		if errors.Is(err, os.ErrNotExist) {
+			return core.ProviderDetection{ProviderID: p.config.ProviderID, Message: fmt.Sprintf("%s was not found in the approved workspace.", p.config.ExecutableName)}, nil
 		}
 		return core.ProviderDetection{}, fmt.Errorf("locate %s: %w", p.config.ItemName, err)
 	}

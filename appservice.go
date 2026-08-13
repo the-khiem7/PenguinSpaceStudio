@@ -36,6 +36,7 @@ type AppService struct {
 	elevation     *elevation.Controller
 	providerMu    sync.Mutex
 	providers     map[string]core.Provider
+	providerOrder []string
 	providerPlans map[string]issuedProviderPlan
 	workspaceRoot string
 }
@@ -68,6 +69,19 @@ func NewAppService() (*AppService, error) {
 			pnpmprovider.ProviderID:       pnpmprovider.NewSystemProvider(),
 			uvprovider.ProviderID:         uvprovider.NewSystemProvider(),
 			yarnprovider.ProviderID:       yarnprovider.NewSystemProvider(),
+		},
+		providerOrder: []string{
+			bunprovider.ProviderID,
+			npmprovider.ProviderID,
+			pnpmprovider.ProviderID,
+			uvprovider.ProviderID,
+			yarnprovider.ProviderID,
+			nugetprovider.ProviderID,
+			cypressprovider.ProviderID,
+			cargoprovider.ProviderID,
+			gradleprovider.ProviderID,
+			mavenprovider.ProviderID,
+			playwrightprovider.ProviderID,
 		},
 		providerPlans: make(map[string]issuedProviderPlan),
 	}, nil
@@ -102,6 +116,62 @@ func (s *AppService) SetWorkspaceRoot(path string) (core.WorkspaceRoot, error) {
 	s.workspaceRoot = root
 	s.providerMu.Unlock()
 	return core.WorkspaceRoot{Path: root}, nil
+}
+
+func (s *AppService) DiscoverDeveloperProviders() []core.ProviderAvailability {
+	s.providerMu.Lock()
+	defer s.providerMu.Unlock()
+
+	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
+	defer cancel()
+	availability := make([]core.ProviderAvailability, 0, len(s.providerOrder))
+	for _, providerID := range s.providerOrder {
+		provider := s.providers[providerID]
+		result := core.ProviderAvailability{ProviderID: providerID}
+		if scoped, ok := provider.(core.WorkspaceScopedProvider); ok {
+			result.WorkspaceScoped = true
+			if s.workspaceRoot == "" {
+				result.Status = core.ProviderWorkspaceRequired
+				result.Message = "Choose an approved workspace root to discover project providers."
+				availability = append(availability, result)
+				continue
+			}
+			if discoverable, ok := provider.(core.WorkspaceDiscoverableProvider); ok {
+				if err := discoverable.WorkspaceApplicable(s.workspaceRoot); err != nil {
+					result.Status = core.ProviderNotApplicable
+					result.Message = err.Error()
+					availability = append(availability, result)
+					continue
+				}
+			}
+			if err := scoped.SetWorkspaceRoot(s.workspaceRoot); err != nil {
+				result.Status = core.ProviderUnavailable
+				result.Message = fmt.Sprintf("Could not configure the approved workspace: %v", err)
+				availability = append(availability, result)
+				continue
+			}
+		}
+
+		detection, err := provider.Detect(ctx)
+		if err != nil {
+			result.Status = core.ProviderUnavailable
+			result.Message = fmt.Sprintf("Could not check provider availability: %v", err)
+			availability = append(availability, result)
+			continue
+		}
+		result.Detection = detection
+		result.Message = detection.Message
+		switch {
+		case detection.NeedsConfiguration:
+			result.Status = core.ProviderNeedsConfiguration
+		case detection.Detected && detection.Supported:
+			result.Status = core.ProviderAvailable
+		default:
+			result.Status = core.ProviderUnavailable
+		}
+		availability = append(availability, result)
+	}
+	return availability
 }
 
 func (s *AppService) InspectDeveloperProvider(providerID string) (core.ProviderInspection, error) {

@@ -47,6 +47,16 @@ It is not a generic PC cleaner or merely a GUI for cache-clearing commands. Its 
 - Commit `1f7098c` adds three bounded M2 providers to the existing Bun, npm, conditional pnpm, and uv slices: Yarn Classic 1.x global-cache cleanup, .NET SDK 6+ NuGet HTTP-cache cleanup, and Cypress 13–15 binary-cache pruning. Each uses an inspected backend-owned plan, mandatory confirmation, tool re-detection and path revalidation, tool-native execution, logical remeasurement, history recording, and deterministic fixture coverage. Modern Yarn, NuGet global-packages/temp/plugins caches, and Cypress App Data remain outside these actions. Cargo, Gradle, Maven, and Playwright remain deferred because their official cleanup semantics need an explicit project/workspace scope, which is an M4 dependency; no broad home-cache deletion is authorized.
 - Commands and external-documentation behaviour are time-sensitive and must be verified against current official sources before a provider is implemented.
 
+## Save checkpoint — discovery-first acceptance and Docker-first boundary
+
+**Code reference:** `d97fa27` (`feat(core,build): add provider discovery and versioned artifact output`). The statements below supersede earlier M2 status language where it conflicts.
+
+- The discovery-first Developer Tools surface is implemented and user-confirmed on Windows through `out/penguinspace-v0.1.1.exe`: supported host providers render as full cards; pnpm without an explicit `storeDir` is a configuration notice; unavailable host tools are collapsed diagnostics; project providers are not rendered before a workspace root is approved.
+- Docker verification passed Wails binding generation (11 methods/16 models), Vue type-check/build, gofmt, vet, internal tests, and the Windows production cross-build. Packaging is versioned and non-overwriting: `scripts/build-windows.ps1 -Version 0.1.1` created `out/penguinspace-v0.1.1.exe` without replacing the older artifact or unversioned compatibility executable.
+- IRYS is a Docker-first Rust project. Its Cargo toolchain, manifest/build context, and build artifacts are outside the current host-workspace Cargo provider, so the absence of a Cargo card is expected and must not be interpreted as the project being non-Rust.
+- The next implementation scope is M3.1 Docker awareness in read-only mode: discover daemon availability and separately report images, stopped containers, BuildKit cache, networks, and volumes. It must not execute cleanup, invoke global prune, or treat volumes as ordinary cache. Docker cleanup semantics and ownership/scoping evidence remain open.
+- A host-native disposable workspace still provides optional follow-up acceptance for Cargo, Gradle, Maven, and Playwright, but it does not resolve the Docker-first IRYS case.
+
 ## Storage model
 
 Every discovered storage item must be represented as one of these domains, never collapsed into a generic “cache” label:

@@ -53,12 +53,31 @@ type StorageItem struct {
 }
 
 type ProviderDetection struct {
-	ProviderID     string `json:"providerId"`
-	Detected       bool   `json:"detected"`
-	Supported      bool   `json:"supported"`
-	Version        string `json:"version,omitempty"`
-	ExecutablePath string `json:"executablePath,omitempty"`
-	Message        string `json:"message"`
+	ProviderID         string `json:"providerId"`
+	Detected           bool   `json:"detected"`
+	Supported          bool   `json:"supported"`
+	NeedsConfiguration bool   `json:"needsConfiguration"`
+	Version            string `json:"version,omitempty"`
+	ExecutablePath     string `json:"executablePath,omitempty"`
+	Message            string `json:"message"`
+}
+
+type ProviderAvailabilityStatus string
+
+const (
+	ProviderAvailable          ProviderAvailabilityStatus = "available"
+	ProviderNeedsConfiguration ProviderAvailabilityStatus = "needs-configuration"
+	ProviderUnavailable        ProviderAvailabilityStatus = "unavailable"
+	ProviderNotApplicable      ProviderAvailabilityStatus = "not-applicable"
+	ProviderWorkspaceRequired  ProviderAvailabilityStatus = "workspace-required"
+)
+
+type ProviderAvailability struct {
+	ProviderID      string                     `json:"providerId"`
+	Status          ProviderAvailabilityStatus `json:"status"`
+	WorkspaceScoped bool                       `json:"workspaceScoped"`
+	Detection       ProviderDetection          `json:"detection"`
+	Message         string                     `json:"message"`
 }
 
 type ScanResult struct {
@@ -124,6 +143,11 @@ type WorkspaceRoot struct {
 type WorkspaceScopedProvider interface {
 	Provider
 	SetWorkspaceRoot(root string) error
+}
+
+type WorkspaceDiscoverableProvider interface {
+	WorkspaceScopedProvider
+	WorkspaceApplicable(root string) error
 }
 
 type Provider interface {

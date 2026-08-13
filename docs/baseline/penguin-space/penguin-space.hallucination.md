@@ -9,6 +9,28 @@ code_ref: "163295b"
 
 # Decisions, unknowns, and claim boundaries
 
+## Current checkpoint — verified facts, decisions, and open scope
+
+**Confirmed implementation and evidence**
+
+- Commit `d97fa27` contains the current discovery-first provider surface and versioned artifact pipeline. Docker verification passed binding generation (11 methods/16 models), Vue type-check/build, gofmt, vet, internal tests, and Windows cross-build.
+- `out/penguinspace-v0.1.1.exe` was built with explicit version `0.1.1`, preserving `out/penguinspace-v0.1.0.exe` and `out/penguinspace.exe`.
+- The user confirmed the `v0.1.1` Windows UI behavior: only available host providers receive Inspect cards; pnpm without `storeDir` is a setup notice; unavailable tools are collapsed; and project providers are absent before selecting a workspace.
+
+**Decisions now in force**
+
+- Discovery is capability-first: startup detection is bounded and read-only; it must not measure bytes, issue a cleanup plan, or execute cleanup.
+- A host-only provider must not claim to inspect a toolchain or cache held only inside Docker. The Docker-first IRYS Rust project is therefore outside the Cargo host-provider scope.
+- Windows packaging requires an explicit semantic version and produces `out/penguinspace-v<version>.exe`. Existing artifacts and a potentially running executable are never overwritten automatically.
+- M3 begins with Docker awareness in read-only mode. `docker system prune`, `docker builder prune`, and volume cleanup are not authorized by this decision.
+
+**Open questions and required evidence**
+
+- Docker daemon/resource discovery must establish exact ownership labels, measurement semantics, and behavior when the daemon is unavailable before any cleanup plan is designed.
+- BuildKit cache may be global/shared; it must not be attributed to one workspace without evidence.
+- Docker volumes remain persistent-state candidates and require a separate Danger workflow plus real recovery/verification evidence before any cleanup is enabled.
+- The four host workspace providers still need optional visual acceptance against a disposable host-native project; this is not evidence for Docker-held project artifacts.
+
 ## Closed decisions
 
 The following are approved and must not be re-litigated during implementation without explicit owner direction:

@@ -24,6 +24,7 @@ func NewSystemProvider() core.Provider { return NewProvider(common.SystemRunner{
 func config() projectcleanup.Config {
 	return projectcleanup.Config{
 		ProviderID: ProviderID, ItemID: "cargo-workspace-target", ItemName: "Cargo workspace target", PlanID: "cargo-workspace-clean-plan", ActionID: "cargo-workspace-clean",
+		ExecutableName:   "cargo",
 		FindExecutable:   func(_ string, runner common.CommandRunner) (string, error) { return runner.LookPath("cargo") },
 		VersionArguments: func(string) []string { return []string{"--version"} },
 		CleanupArguments: func(root string) []string {

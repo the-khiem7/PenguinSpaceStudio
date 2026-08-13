@@ -26,5 +26,18 @@ tasks:
   build:
     deps: [build:frontend]
     cmds:
-      - mkdir -p {{.BIN_DIR}}
-      - GOOS={{.GOOS}} GOARCH={{.GOARCH}} CGO_ENABLED=0 go build -tags production -trimpath -buildvcs=false -ldflags='-w -s -H windowsgui' -o {{.BIN_DIR}}/{{.APP_NAME}}.exe .
+      - |
+        set -eu
+        : "${VERSION:?VERSION is required (for example, VERSION=0.1.0 task build)}"
+        case "$VERSION" in
+          [0-9]*.[0-9]*.[0-9]*) ;;
+          *) echo "VERSION must be a semantic version without a leading v (for example, 0.1.0): $VERSION" >&2; exit 1 ;;
+        esac
+        artifact="{{.BIN_DIR}}/{{.APP_NAME}}-v${VERSION}.exe"
+        if [ -e "$artifact" ]; then
+          echo "Refusing to overwrite existing artifact: $artifact" >&2
+          exit 1
+        fi
+        mkdir -p "{{.BIN_DIR}}"
+        GOOS={{.GOOS}} GOARCH={{.GOARCH}} CGO_ENABLED=0 go build -tags production -trimpath -buildvcs=false -ldflags='-w -s -H windowsgui' -o "$artifact" .
+        printf 'Built Windows artifact: %s\n' "$artifact"

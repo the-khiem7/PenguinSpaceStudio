@@ -25,6 +25,7 @@ func NewSystemProvider() core.Provider { return NewProvider(common.SystemRunner{
 func config() projectcleanup.Config {
 	return projectcleanup.Config{
 		ProviderID: ProviderID, ItemID: "gradle-workspace-build", ItemName: "Gradle workspace build output", PlanID: "gradle-workspace-clean-plan", ActionID: "gradle-workspace-clean",
+		ExecutableName:     "Gradle wrapper",
 		FindExecutable:     findWrapper,
 		VersionArguments:   func(string) []string { return []string{"--version"} },
 		CleanupArguments:   func(root string) []string { return []string{"--no-daemon", "-p", root, ":clean"} },
