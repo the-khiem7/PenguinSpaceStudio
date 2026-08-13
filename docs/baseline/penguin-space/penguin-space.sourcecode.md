@@ -4,7 +4,7 @@ pack: "penguin-space"
 document: "sourcecode"
 status: "active"
 updated: "2026-08-13"
-code_ref: "HEAD (M3.3 Windows acceptance checkpoint)"
+code_ref: "HEAD (M3.4 Docker cleanup-semantics decision)"
 ---
 
 # Architecture and implementation
@@ -93,6 +93,10 @@ The inspector lists backend-owned identifiers, then uses bounded batches of at m
 BuildKit remains outside project groups. `docker builder du --format json` yields ID-backed selected-builder records and shared/mutable/reclaimable flags; daemon-wide cache bytes remain separate. Vue renders daemon totals, project/unscoped resources, relationships, and builder metrics as observation-only surfaces. Volumes receive `RiskDanger`, Stateful styling, and no action. Refresh clears the prior awareness payload before requesting a new one. No cleanup endpoint, plan, prune/delete command, frontend-supplied Docker argument, or mutation control exists.
 
 Final Compose verification regenerated 12-method/25-model bindings, passed Vue type-check/build, gofmt, vet, internal tests, and Windows production cross-build. Live read-only commands against Docker Engine 29.5.3 confirmed 3 images, 0 containers, projects `docker` and `penguinspacestudio`, 1 unscoped image, 2 custom networks with zero attachments, 10 volumes with zero mounts, and 40 selected-builder records including 22 shared. Windows UAT on `out/penguinspace-v0.1.3.exe` then confirmed the complete available presentation—including 8 `docker` resources, 6 `penguinspacestudio` resources, one explicit unscoped image, Stateful/Danger volumes, and selected-builder 40/22 shared/5 mutable metrics—and the unavailable refresh state with every prior Docker card removed. No cleanup control or mutation was exposed.
+
+## M3.4 cleanup-semantics boundary
+
+M3.5 is limited to one exact custom network per reviewed plan. The planner requires a fresh complete ownership snapshot, valid Compose project/network labels, and an available zero attachment count. The backend retains the immutable network ID, re-inspects it immediately before execution, rejects missing/changed labels or any attachment, invokes only `docker network rm <ID>` without force, then verifies that exact ID is absent. It reports no reclaimed-byte claim. Images, stopped containers, BuildKit, volumes, broad prune, and multi-target commands remain unavailable. M3.6 may only enumerate WSL distros and backing VHDX metadata without shutdown, elevation, mount, optimization, or compaction.
 
 ## Required core models
 

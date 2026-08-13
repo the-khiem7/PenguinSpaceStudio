@@ -4,7 +4,7 @@ pack: "penguin-space"
 document: "useguide"
 status: "draft"
 updated: "2026-08-13"
-code_ref: "HEAD (M3.3 Windows acceptance checkpoint)"
+code_ref: "HEAD (M3.4 Docker cleanup-semantics decision)"
 ---
 
 # Intended product interaction contract
@@ -44,6 +44,8 @@ Each resource row displays a backend-observed ID and current relationships: imag
 **Selected Docker builder** is a separate selected-builder card. It summarizes BuildKit record, shared, mutable, and daemon-reported reclaimable flags but never assigns records to a Compose project. Every volume remains **Stateful · Danger** even when its mount count is zero. These labels and counts are observation only: there is no Review, Clean, Prune, Delete, or volume action.
 
 Windows UAT on `out/penguinspace-v0.1.3.exe` confirms both M3.3 states. With Docker 29.5.3 available, screenshots showed separate five-category daemon totals; Compose projects `docker` with 8 resources and `penguinspacestudio` with 6; one explicit unscoped Rancher image; ID-backed zero relationship counts; all ten volumes as **Stateful · Danger**; and selected-builder metrics of 40 records, 22 shared, 5 mutable, and 40 reported reclaimable with no project attribution or cleanup controls. After Rancher Desktop stopped, **Refresh Docker** displayed daemon unavailable and removed all totals, project/unscoped, and BuildKit cards without stale observations. No stopped-container fixture was created or removed for this acceptance.
+
+M3.4 authorizes only a future **Review empty network removal** action on an exact Compose custom network. The action must be one network at a time, show project/network identity and the consequence that Compose may recreate it, require explicit confirmation, and disappear or fail safely if any attachment or label changes. It never offers image, container, BuildKit, volume, or blanket-prune cleanup. M3.6 WSL information remains observation-only.
 
 ## Scan-to-clean flow
 

@@ -4,7 +4,7 @@ pack: "penguin-space"
 document: "roadmap"
 status: "active"
 updated: "2026-08-13"
-code_ref: "HEAD (M3.3 Windows acceptance checkpoint)"
+code_ref: "HEAD (M3.4 Docker cleanup-semantics decision)"
 ---
 
 # Product roadmap and verification state
@@ -100,6 +100,8 @@ Implement Docker/Docker Desktop/Rancher awareness; independent resource inspecti
 
 **M3.3 implementation and Windows acceptance checkpoint (2026-08-13):** `DockerAwareness` adds exact-label project groups, an always-present `unscoped` group, ID-backed resource observations, per-relationship availability, an ownership-completeness flag, and a separate selected-builder BuildKit scope. Bounded Docker inspect batches derive image container references, stopped-container image/network/mount relationships, custom-network attachments, and volume mounts. Valid Compose grouping requires a canonical project name and non-conflicting labels for the resource type; missing/malformed/conflicting values fail closed to `unscoped`. Partial list or inspect failures emit warnings, make dependent counts unavailable, and mark the snapshot incomplete rather than presenting omissions as zero. Vue renders daemon totals separately from ownership groups, marks volumes Stateful/Danger, and exposes no cleanup control. Final `docker compose run --rm verify` passed bindings (12 methods, 7 enums, 25 models), Vue type-check/build, gofmt, vet, all internal tests, and Windows cross-build. Live read-only evidence remained 3 images, 0 containers, 2 unattached custom networks, 10 unmounted volumes, projects `docker` and `penguinspacestudio`, 1 unscoped image, and 40 selected-builder records/22 shared. Semantic review found no Critical/High issue; its two Medium completeness/label-validation findings were fixed before this checkpoint. `out/penguinspace-v0.1.3.exe` (13,830,656 bytes; SHA-256 `1eec64324e6c6eb757ee19e4ae698b922998dcaafeff4d9051fbb7d27e37d0a8`) then passed user-supplied Windows UAT: available screenshots confirmed separate totals, 8 `docker` resources, 6 `penguinspacestudio` resources, 1 unscoped image, ID-backed zero relationships, ten Stateful/Danger volumes, selected-builder 40 records/22 shared/5 mutable, and no cleanup controls; after Rancher stopped, Refresh reported daemon unavailable and removed every prior Docker card. No stopped-container fixture or Docker mutation was performed.
 
+**M3.4 Docker cleanup-semantics decision (2026-08-13):** current Docker CLI semantics were reviewed per resource. M3.5 may implement only removal of one exact custom network at a time, because `docker network rm <ID>` is target-specific and refuses a connected network. Eligibility requires a complete fresh ownership snapshot, a valid Compose project/network label, zero attachment IDs, backend-retained exact ID, immediate re-inspection before execution, explicit Review confirmation, no force flag, and post-command verification that the ID is absent. It must report outcome only, not reclaimed bytes. Images remain blocked because removal can untag multiple references and shared-layer bytes are unresolved; stopped containers remain blocked because writable-layer/state-loss and mount semantics lack a fixture; BuildKit remains blocked because prune operates on selected-builder cache sets rather than observed record IDs; volumes remain blocked as Stateful/Danger. Blanket prune and multi-resource removal are prohibited. M3.6 is separately authorized only for read-only WSL distro/VHDX discovery—no shutdown, elevation, mount, optimize, compact, or mutation. Sources: [network rm](https://docs.docker.com/reference/cli/docker/network/rm/), [container rm](https://docs.docker.com/reference/cli/docker/container/rm/), [image rm](https://docs.docker.com/reference/cli/docker/image/rm/), [builder prune](https://docs.docker.com/reference/cli/docker/builder/prune/), and [system prune](https://docs.docker.com/reference/cli/docker/system/prune/). External documentation content is paraphrased for licensing compliance.
+
 ## Milestone 4 — Project storage
 
 **Depends on:** Milestone 1 scanner and workspace configuration.
@@ -143,7 +145,7 @@ Cover failure recovery, locked files, permission failures, malformed output, par
 
 ## Exact next action
 
-Open a bounded M3 continuation decision before adding code: choose and document the next evidence-only scope between Docker cleanup semantics and read-only WSL/VHDX discovery. No cleanup, prune, delete, volume mutation, elevation reuse, distro shutdown, or compaction is authorized until that scope has explicit fixtures, recovery boundaries, and acceptance criteria. The stopped-container runtime fixture remains optional evidence and must not be created on the user's daemon without explicit approval.
+Implement M3.5 as one retained-plan lifecycle for a single eligible Compose custom network: inspect and issue an exact-ID Review plan, require explicit confirmation, re-inspect labels and zero attachments, run only `docker network rm <ID>` without force, verify absence, refresh awareness, and record an outcome with reclaimed bytes unavailable. Automated tests must use a fake runner or an explicitly isolated disposable fixture; existing user networks and all other Docker resource classes remain outside execution.
 
 ## Save checkpoint — 2026-08-13
 

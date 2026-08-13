@@ -4,7 +4,7 @@ pack: "penguin-space"
 document: "hallucination"
 status: "active"
 updated: "2026-08-13"
-code_ref: "HEAD (M3.3 Windows acceptance checkpoint)"
+code_ref: "HEAD (M3.4 Docker cleanup-semantics decision)"
 ---
 
 # Decisions, unknowns, and claim boundaries
@@ -48,7 +48,7 @@ code_ref: "HEAD (M3.3 Windows acceptance checkpoint)"
 
 **Decision:** canonical Compose labels are sufficient metadata for read-only presentation grouping, not ownership proof or cleanup authorization. Labels are static for an object's lifetime but still metadata; no name-prefix inference is allowed. Every absent, conflicting, or malformed label produces an explicit unscoped group. Relationship counts are observations and must be revalidated from Docker IDs. BuildKit remains outside project grouping. Volumes remain Stateful/Danger without exception.
 
-**Follow-on:** M3.3 implements and Windows-validates only these read-only grouping and relationship fields, including fail-closed incomplete-snapshot handling. Docker cleanup semantics, image shared-layer reclaim, a stopped-container fixture, volume recovery, and WSL/VHDX behavior remain open.
+**Follow-on:** M3.3 implements and Windows-validates only these read-only grouping and relationship fields, including fail-closed incomplete-snapshot handling. M3.4 authorizes M3.5 to remove only one exact, revalidated, empty Compose custom network with explicit Review confirmation and post-removal verification. Images, containers, BuildKit, volumes, broad prune, and multi-target removal remain blocked. M3.6 is read-only WSL/VHDX discovery only.
 
 ## Closed decisions
 
