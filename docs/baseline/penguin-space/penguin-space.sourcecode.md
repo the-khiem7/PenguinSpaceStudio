@@ -4,7 +4,7 @@ pack: "penguin-space"
 document: "sourcecode"
 status: "active"
 updated: "2026-08-13"
-code_ref: "114a64b + M3.2 runtime evidence (no code change)"
+code_ref: "HEAD (M3.3 read-only ownership presentation phase commit)"
 ---
 
 # Architecture and implementation
@@ -82,7 +82,17 @@ The accepted future grouping key is the exact `com.docker.compose.project` label
 
 Relationship observations must remain ID-backed: image references from containers, container status, network attachment IDs, and volume mount references. They can change after inspection and require action-time revalidation if cleanup is ever designed. The current runtime had no containers, two unattached custom Compose networks, and ten unmounted Compose volumes; absence of a current relationship does not mean disposable.
 
-BuildKit remains a separate selected-builder scope. Its records expose mutable/shared/reclaimable metadata but no canonical project identity; M3.2 observed 40 records with 22 shared. Volumes remain Stateful/Danger regardless of project label or mount count. M3.3 may expose these fields read-only, but no executor or cleanup model is authorized.
+BuildKit remains a separate selected-builder scope. Its records expose mutable/shared/reclaimable metadata but no canonical project identity; M3.2 observed 40 records with 22 shared. Volumes remain Stateful/Danger regardless of project label or mount count. No executor or cleanup model is authorized.
+
+## M3.3 ownership presentation implementation
+
+`DockerAwareness` preserves the ordered daemon-wide `DockerResourceSummary` list and adds `DockerOwnershipGroup`, `DockerScopedResource`, canonical Compose label fields, typed relationship observations, `OwnershipComplete`, and `DockerBuilderScope`. The explicit `unscoped` group is always returned. A project group requires a valid lowercase Compose project name and no resource-type-conflicting service/network/volume labels; missing, malformed, and conflicting metadata fail closed to `unscoped` without inference.
+
+The inspector lists backend-owned identifiers, then uses bounded batches of at most 48 arguments for image, container, network, and volume inspect calls. All containers contribute image-reference and named-volume-mount counts; only created/exited/dead containers become ownership cards. Network attachment maps and container mounts supply point-in-time counts. Every dependent relationship carries an availability flag. Failed lists, failed inspect batches, or malformed rows emit warnings and make `OwnershipComplete` false, so omitted resources cannot be presented as a complete empty/unscoped result.
+
+BuildKit remains outside project groups. `docker builder du --format json` yields ID-backed selected-builder records and shared/mutable/reclaimable flags; daemon-wide cache bytes remain separate. Vue renders daemon totals, project/unscoped resources, relationships, and builder metrics as observation-only surfaces. Volumes receive `RiskDanger`, Stateful styling, and no action. Refresh clears the prior awareness payload before requesting a new one. No cleanup endpoint, plan, prune/delete command, frontend-supplied Docker argument, or mutation control exists.
+
+Final Compose verification regenerated 12-method/25-model bindings, passed Vue type-check/build, gofmt, vet, internal tests, and Windows production cross-build. Live read-only commands against Docker Engine 29.5.3 confirmed 3 images, 0 containers, projects `docker` and `penguinspacestudio`, 1 unscoped image, 2 custom networks with zero attachments, 10 volumes with zero mounts, and 40 selected-builder records including 22 shared. Windows visual acceptance for the new presentation remains pending.
 
 ## Required core models
 

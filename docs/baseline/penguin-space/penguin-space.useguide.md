@@ -4,7 +4,7 @@ pack: "penguin-space"
 document: "useguide"
 status: "draft"
 updated: "2026-08-13"
-code_ref: "114a64b (M3.1 accepted on Windows via v0.1.2; M3.2 evidence only)"
+code_ref: "HEAD (M3.3 read-only ownership presentation phase commit)"
 ---
 
 # Intended product interaction contract
@@ -33,7 +33,17 @@ At launch and on **Refresh Docker**, PenguinSpace performs a bounded read-only d
 
 Volumes are marked **Stateful** because they may contain persistent data. No M3.1 card has a review, clean, prune, or delete control. If the Docker CLI is missing or the daemon cannot be reached, the surface reports that state without showing stale resource claims. Partial category failures appear as warnings and unavailable values. A future cleanup workflow must not reuse this observation surface as authorization.
 
-Windows acceptance on `out/penguinspace-v0.1.2.exe` confirms both states. With Docker 29.5.3 available, the surface displayed exactly five resource categories and Stateful volumes without cleanup controls. After the operator stopped Rancher Desktop, **Refresh Docker** displayed **Daemon unavailable / Docker resources were not inspected** and removed the previous cards. Rancher was later restarted for M3.2 read-only ownership evidence.
+Windows acceptance on `out/penguinspace-v0.1.2.exe` confirms both M3.1 states. With Docker 29.5.3 available, the surface displayed exactly five resource categories and Stateful volumes without cleanup controls. After the operator stopped Rancher Desktop, **Refresh Docker** displayed **Daemon unavailable / Docker resources were not inspected** and removed the previous cards. Rancher was later restarted for M3.2 read-only ownership evidence.
+
+## M3.3 Docker ownership presentation
+
+When the daemon is available, the Docker surface first retains the five daemon-wide total cards, then shows a separate **Project groups and unscoped resources** section. A project heading comes only from a valid exact `com.docker.compose.project` label. Resource names, image tags, paths, timestamps, and prefixes never move an item into a project. Resources without valid, type-consistent canonical Compose labels appear under the explicit **unscoped** heading.
+
+Each resource row displays a backend-observed ID and current relationships: images show container references; stopped containers show their image plus network and mount counts; custom networks show container attachments; volumes show container mounts. A dash means the relationship was unavailable, not zero. If any list/inspect batch is incomplete, the surface states that the ownership snapshot is incomplete and does not claim missing resources are unscoped or unused.
+
+**Selected Docker builder** is a separate selected-builder card. It summarizes BuildKit record, shared, mutable, and daemon-reported reclaimable flags but never assigns records to a Compose project. Every volume remains **Stateful · Danger** even when its mount count is zero. These labels and counts are observation only: there is no Review, Clean, Prune, Delete, or volume action.
+
+Docker verification and live daemon-data checks pass, but the M3.3 presentation has not yet received Windows visual acceptance. The next acceptance run should use a new explicit versioned artifact, verify both daemon states and stale-state clearing, and must not create or remove a Docker fixture merely to populate the stopped-container row.
 
 ## Scan-to-clean flow
 

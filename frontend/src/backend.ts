@@ -79,6 +79,24 @@ export type ProviderCleanupOutcome = {
 
 export type WorkspaceRoot = { path: string };
 
+export type DockerRelationshipObservation = {
+  kind: string;
+  count: number;
+  available: boolean;
+};
+
+export type DockerScopedResource = {
+  id: string;
+  kind: string;
+  name: string;
+  scope: "compose-project" | "unscoped";
+  labels: { project?: string; service?: string; network?: string; volume?: string };
+  relationships: DockerRelationshipObservation[];
+  relatedResourceId?: string;
+  stateful: boolean;
+  risk: string;
+};
+
 export type DockerAwareness = {
   daemon: {
     cliAvailable: boolean;
@@ -100,6 +118,21 @@ export type DockerAwareness = {
     stateful: boolean;
     boundary: string;
   }>;
+  ownershipGroups: Array<{
+    scope: "compose-project" | "unscoped";
+    project?: string;
+    resources: DockerScopedResource[];
+  }>;
+  ownershipComplete: boolean;
+  builder: {
+    scope: "selected-builder";
+    name: string;
+    count: number;
+    countAvailable: boolean;
+    sharedCount: number;
+    records: Array<{ id: string; shared: boolean; mutable: boolean; reclaimable: boolean }>;
+    boundary: string;
+  };
   warnings: string[] | null;
 };
 

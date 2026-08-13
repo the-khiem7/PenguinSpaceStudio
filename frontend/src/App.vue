@@ -123,6 +123,29 @@ function formatBytes(bytes: number, kind: string) {
   return `${(bytes / 1024 ** exponent).toLocaleString(undefined, { maximumSignificantDigits: 3 })} ${units[exponent]}`;
 }
 
+function compactDockerID(id: string) {
+  const value = id.startsWith("sha256:") ? id.slice(7) : id;
+  return value.length > 16 ? `${value.slice(0, 16)}…` : value;
+}
+
+function relationshipLabel(kind: string) {
+  const labels: Record<string, string> = {
+    "container-references": "container references",
+    "container-attachments": "container attachments",
+    "container-mounts": "container mounts",
+    networks: "networks",
+    mounts: "mounts",
+  };
+  return labels[kind] ?? kind;
+}
+
+function composeDetail(resource: DockerAwareness["ownershipGroups"][number]["resources"][number]) {
+  if (resource.labels.service) return `service: ${resource.labels.service}`;
+  if (resource.labels.network) return `network: ${resource.labels.network}`;
+  if (resource.labels.volume) return `volume: ${resource.labels.volume}`;
+  return resource.scope === "unscoped" ? "No canonical Compose project label" : "Project label only";
+}
+
 async function runFixture() {
   running.value = true;
   error.value = "";
@@ -260,14 +283,14 @@ function availabilityMessage(providerID: string) {
       <section id="containers" class="provider-category docker-awareness" aria-labelledby="docker-awareness-title">
         <div class="provider-category-heading">
           <div>
-            <p class="eyebrow">M3.1 · Read-only</p>
-            <h2 id="docker-awareness-title">Docker daemon awareness</h2>
-            <p class="muted">Images, stopped containers, BuildKit cache, custom networks, and volumes are inspected independently. No cleanup command is exposed.</p>
+            <p class="eyebrow">M3.3 · Read-only ownership</p>
+            <h2 id="docker-awareness-title">Docker resource ownership view</h2>
+            <p class="muted">Daemon totals stay separate from exact Compose-label grouping. Relationships are point-in-time observations; no cleanup command is exposed.</p>
           </div>
           <button class="secondary" :disabled="dockerLoading" @click="refreshDockerAwareness">{{ dockerLoading ? "Inspecting…" : "Refresh Docker" }}</button>
         </div>
         <p v-if="dockerError" class="error" role="alert">{{ dockerError }}</p>
-        <p v-else-if="dockerLoading && !dockerAwareness" class="muted provider-loading">Checking Docker daemon and resource categories…</p>
+        <p v-else-if="dockerLoading && !dockerAwareness" class="muted provider-loading">Checking Docker daemon, ownership labels, and relationships…</p>
         <div v-else-if="dockerAwareness" class="docker-status">
           <article class="panel docker-daemon" :class="{ available: dockerAwareness.daemon.available }">
             <div>
@@ -277,21 +300,94 @@ function availabilityMessage(providerID: string) {
             </div>
             <small>{{ dockerAwareness.daemon.message }}</small>
           </article>
-          <div v-if="dockerAwareness.daemon.available" class="docker-resource-grid">
-            <article v-for="resource in dockerAwareness.resources" :key="resource.kind" class="panel docker-resource" :class="{ stateful: resource.stateful }">
-              <div class="docker-resource-heading">
-                <strong>{{ resource.name }}</strong>
-                <span v-if="resource.stateful" class="danger-tag">Stateful</span>
-                <span v-else class="readonly-tag">Read-only</span>
+
+          <template v-if="dockerAwareness.daemon.available">
+            <section class="docker-subsection" aria-labelledby="docker-totals-title">
+              <div class="docker-subsection-heading">
+                <div>
+                  <p class="eyebrow">Daemon-wide</p>
+                  <h3 id="docker-totals-title">Resource totals</h3>
+                </div>
+                <span class="readonly-tag">Observation only</span>
               </div>
-              <div class="docker-resource-metrics">
-                <span><b>{{ resource.countAvailable ? resource.count : "—" }}</b><small>items</small></span>
-                <span><b>{{ formatBytes(resource.size.bytes, resource.size.kind) }}</b><small>daemon size</small></span>
-                <span><b>{{ formatBytes(resource.reclaimable.bytes, resource.reclaimable.kind) }}</b><small>reported reclaimable</small></span>
+              <div class="docker-resource-grid">
+                <article v-for="resource in dockerAwareness.resources" :key="resource.kind" class="panel docker-resource" :class="{ stateful: resource.stateful }">
+                  <div class="docker-resource-heading">
+                    <strong>{{ resource.name }}</strong>
+                    <span v-if="resource.stateful" class="danger-tag">Stateful · Danger</span>
+                    <span v-else class="readonly-tag">Read-only</span>
+                  </div>
+                  <div class="docker-resource-metrics">
+                    <span><b>{{ resource.countAvailable ? resource.count : "—" }}</b><small>items</small></span>
+                    <span><b>{{ formatBytes(resource.size.bytes, resource.size.kind) }}</b><small>daemon size</small></span>
+                    <span><b>{{ formatBytes(resource.reclaimable.bytes, resource.reclaimable.kind) }}</b><small>reported reclaimable</small></span>
+                  </div>
+                  <p>{{ resource.boundary }}</p>
+                </article>
               </div>
-              <p>{{ resource.boundary }}</p>
-            </article>
-          </div>
+            </section>
+
+            <section class="docker-subsection" aria-labelledby="docker-ownership-title">
+              <div class="docker-subsection-heading">
+                <div>
+                  <p class="eyebrow">Canonical Compose labels</p>
+                  <h3 id="docker-ownership-title">Project groups and unscoped resources</h3>
+                </div>
+                <span class="readonly-tag">ID-backed</span>
+              </div>
+              <p v-if="!dockerAwareness.ownershipComplete" class="ownership-incomplete">Ownership snapshot is incomplete. Missing inspect results are not treated as unscoped resources or zero relationships.</p>
+              <div class="ownership-groups">
+                <article v-for="group in dockerAwareness.ownershipGroups" :key="group.scope === 'unscoped' ? 'unscoped' : group.project" class="panel ownership-group" :class="{ unscoped: group.scope === 'unscoped' }">
+                  <header>
+                    <div>
+                      <span class="scope-kicker">{{ group.scope === "unscoped" ? "Explicit boundary" : "Compose project" }}</span>
+                      <h4>{{ group.scope === "unscoped" ? "unscoped" : group.project }}</h4>
+                    </div>
+                    <b>{{ group.resources.length }} resources</b>
+                  </header>
+                  <p v-if="group.resources.length === 0" class="empty-state">{{ dockerAwareness.ownershipComplete ? "No resources lack a valid canonical Compose project label." : "No unscoped resources were available in this partial snapshot." }}</p>
+                  <div v-else class="ownership-resource-list">
+                    <div v-for="resource in group.resources" :key="`${resource.kind}:${resource.id}`" class="ownership-resource" :class="{ stateful: resource.stateful }">
+                      <div class="ownership-resource-title">
+                        <div>
+                          <span>{{ resource.kind }}</span>
+                          <strong>{{ resource.name }}</strong>
+                        </div>
+                        <span v-if="resource.stateful" class="danger-tag">Stateful · Danger</span>
+                      </div>
+                      <code :title="resource.id">{{ compactDockerID(resource.id) }}</code>
+                      <small>{{ composeDetail(resource) }}</small>
+                      <div class="relationship-list">
+                        <span v-for="relation in resource.relationships" :key="relation.kind">
+                          <b>{{ relation.available ? relation.count : "—" }}</b>
+                          {{ relationshipLabel(relation.kind) }}
+                        </span>
+                        <span v-if="resource.relatedResourceId"><b>image</b> {{ compactDockerID(resource.relatedResourceId) }}</span>
+                      </div>
+                    </div>
+                  </div>
+                </article>
+              </div>
+            </section>
+
+            <section class="panel builder-scope" aria-labelledby="builder-scope-title">
+              <div class="docker-subsection-heading">
+                <div>
+                  <p class="eyebrow">{{ dockerAwareness.builder.scope }}</p>
+                  <h3 id="builder-scope-title">{{ dockerAwareness.builder.name }}</h3>
+                </div>
+                <span class="readonly-tag">No project attribution</span>
+              </div>
+              <div class="builder-metrics">
+                <span><b>{{ dockerAwareness.builder.countAvailable ? dockerAwareness.builder.count : "—" }}</b><small>cache records</small></span>
+                <span><b>{{ dockerAwareness.builder.countAvailable ? dockerAwareness.builder.sharedCount : "—" }}</b><small>shared records</small></span>
+                <span><b>{{ dockerAwareness.builder.countAvailable ? dockerAwareness.builder.records.filter((record) => record.mutable).length : "—" }}</b><small>mutable records</small></span>
+                <span><b>{{ dockerAwareness.builder.countAvailable ? dockerAwareness.builder.records.filter((record) => record.reclaimable).length : "—" }}</b><small>reported reclaimable</small></span>
+              </div>
+              <p>{{ dockerAwareness.builder.boundary }}</p>
+            </section>
+          </template>
+
           <ul v-if="dockerAwareness.warnings?.length" class="docker-warnings">
             <li v-for="warning in dockerAwareness.warnings" :key="warning">{{ warning }}</li>
           </ul>

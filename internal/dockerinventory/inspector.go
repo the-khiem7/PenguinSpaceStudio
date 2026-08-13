@@ -9,6 +9,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"regexp"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -17,7 +18,12 @@ import (
 	"github.com/the-khiem7/PenguinSpaceStudio/internal/providers/common"
 )
 
-var sizePattern = regexp.MustCompile(`^([0-9]+(?:\.[0-9]+)?)([kMGTPE]?B)$`)
+var (
+	sizePattern           = regexp.MustCompile(`^([0-9]+(?:\.[0-9]+)?)([kMGTPE]?B)$`)
+	composeProjectPattern = regexp.MustCompile(`^[a-z0-9][a-z0-9_-]*$`)
+)
+
+const inspectBatchSize = 48
 
 type Inspector struct {
 	runner common.CommandRunner
@@ -71,13 +77,16 @@ func (i *Inspector) Inspect(ctx context.Context) core.DockerAwareness {
 	report.Daemon.Message = "Docker daemon is available. Resource inspection is read-only."
 
 	diskUsage := i.inspectDiskUsage(ctx, executable, &report)
+	buildCache, builder := i.inspectBuildCache(ctx, executable, diskUsage["Build Cache"], &report)
 	report.Resources = []core.DockerResourceSummary{
 		i.inspectImages(ctx, executable, diskUsage["Images"], &report),
 		i.inspectStoppedContainers(ctx, executable, &report),
-		i.inspectBuildCache(ctx, executable, diskUsage["Build Cache"], &report),
+		buildCache,
 		i.inspectNetworks(ctx, executable, &report),
 		i.inspectVolumes(ctx, executable, diskUsage["Local Volumes"], &report),
 	}
+	report.OwnershipGroups, report.OwnershipComplete = i.inspectOwnership(ctx, executable, &report)
+	report.Builder = builder
 	return report
 }
 
@@ -112,7 +121,7 @@ func (i *Inspector) inspectDiskUsage(ctx context.Context, executable string, rep
 }
 
 func (i *Inspector) inspectImages(ctx context.Context, executable string, usage diskUsageRow, report *core.DockerAwareness) core.DockerResourceSummary {
-	result := resource("images", "Images", usage, "Daemon-wide image storage can contain shared layers; no image is assigned to one project or selected for cleanup.")
+	result := resource("images", "Images", usage, "Daemon-wide image storage can contain shared layers. Compose labels are shown only as grouping metadata and never as cleanup authority.")
 	output, err := i.runner.Run(ctx, executable, "image", "ls", "--all", "--format", "json")
 	if err != nil {
 		return failedCount(result, report, "images", err)
@@ -132,7 +141,7 @@ func (i *Inspector) inspectImages(ctx context.Context, executable string, usage 
 }
 
 func (i *Inspector) inspectStoppedContainers(ctx context.Context, executable string, report *core.DockerAwareness) core.DockerResourceSummary {
-	result := resource("stopped-containers", "Stopped containers", diskUsageRow{}, "Only non-running container states are counted. Their scoped writable-layer size is not claimed, and no removal action is available.")
+	result := resource("stopped-containers", "Stopped containers", diskUsageRow{}, "Only created, exited, or dead containers are grouped. Their writable-layer size is not claimed, and no removal action is available.")
 	output, err := i.runner.Run(ctx, executable, "container", "ls", "--all", "--filter", "status=created", "--filter", "status=exited", "--filter", "status=dead", "--format", "json")
 	if err != nil {
 		return failedCount(result, report, "stopped containers", err)
@@ -140,17 +149,42 @@ func (i *Inspector) inspectStoppedContainers(ctx context.Context, executable str
 	return setValidatedCount(result, report, "stopped containers", output, "ID")
 }
 
-func (i *Inspector) inspectBuildCache(ctx context.Context, executable string, usage diskUsageRow, report *core.DockerAwareness) core.DockerResourceSummary {
-	result := resource("build-cache", "BuildKit cache", usage, "The count comes from the active builder while daemon-wide cache bytes can be shared across builders and projects. This phase does not attribute or prune it.")
+func (i *Inspector) inspectBuildCache(ctx context.Context, executable string, usage diskUsageRow, report *core.DockerAwareness) (core.DockerResourceSummary, core.DockerBuilderScope) {
+	result := resource("build-cache", "BuildKit cache", usage, "Records belong to the selected builder scope. They are not attributed to Compose projects and no prune action is available.")
+	scope := core.DockerBuilderScope{
+		Scope:    "selected-builder",
+		Name:     "Selected Docker builder",
+		Boundary: "BuildKit records are reported by docker builder du for the selected builder only. Shared records are not project ownership evidence.",
+	}
 	output, err := i.runner.Run(ctx, executable, "builder", "du", "--format", "json")
 	if err != nil {
-		return failedCount(result, report, "BuildKit cache records", err)
+		return failedCount(result, report, "BuildKit cache records", err), scope
 	}
-	return setValidatedCount(result, report, "BuildKit cache records", output, "ID")
+	for _, line := range nonEmptyLines(output) {
+		var value struct {
+			ID          string `json:"ID"`
+			Shared      bool   `json:"Shared"`
+			Mutable     bool   `json:"Mutable"`
+			Reclaimable bool   `json:"Reclaimable"`
+		}
+		if err := json.Unmarshal([]byte(line), &value); err != nil || value.ID == "" {
+			return failedCount(result, report, "BuildKit cache records", errors.New("Docker returned a malformed BuildKit row")), scope
+		}
+		scope.Records = append(scope.Records, core.DockerBuildCacheRecord{
+			ID: value.ID, Shared: value.Shared, Mutable: value.Mutable, Reclaimable: value.Reclaimable,
+		})
+		if value.Shared {
+			scope.SharedCount++
+		}
+	}
+	scope.Count = uint64(len(scope.Records))
+	scope.CountAvailable = true
+	result.Count, result.CountAvailable = scope.Count, true
+	return result, scope
 }
 
 func (i *Inspector) inspectNetworks(ctx context.Context, executable string, report *core.DockerAwareness) core.DockerResourceSummary {
-	result := resource("networks", "Custom networks", diskUsageRow{}, "Custom networks are reported independently but have no disk-size claim and no removal action.")
+	result := resource("networks", "Custom networks", diskUsageRow{}, "Custom networks are grouped by exact Compose labels. Attachment counts are point-in-time observations, not removal authorization.")
 	output, err := i.runner.Run(ctx, executable, "network", "ls", "--filter", "type=custom", "--format", "json")
 	if err != nil {
 		return failedCount(result, report, "custom networks", err)
@@ -159,13 +193,280 @@ func (i *Inspector) inspectNetworks(ctx context.Context, executable string, repo
 }
 
 func (i *Inspector) inspectVolumes(ctx context.Context, executable string, usage diskUsageRow, report *core.DockerAwareness) core.DockerResourceSummary {
-	result := resource("volumes", "Volumes", usage, "Volumes are persistent-state candidates. They remain Danger scope and cannot be cleaned or mutated in M3.1.")
+	result := resource("volumes", "Volumes", usage, "Volumes remain Stateful and Danger regardless of Compose labels or current mount count. M3.3 cannot clean or mutate them.")
 	result.Stateful = true
 	output, err := i.runner.Run(ctx, executable, "volume", "ls", "--format", "json")
 	if err != nil {
 		return failedCount(result, report, "volumes", err)
 	}
 	return setValidatedCount(result, report, "volumes", output, "Name")
+}
+
+type imageInspect struct {
+	ID       string `json:"Id"`
+	RepoTags []string
+	Config   struct {
+		Labels map[string]string
+	}
+}
+
+type containerInspect struct {
+	ID    string `json:"Id"`
+	Name  string
+	Image string
+	State struct {
+		Status string
+	}
+	Config struct {
+		Labels map[string]string
+	}
+	NetworkSettings struct {
+		Networks map[string]json.RawMessage
+	}
+	Mounts []struct {
+		Type string
+		Name string
+	}
+}
+
+type networkInspect struct {
+	ID         string `json:"Id"`
+	Name       string
+	Labels     map[string]string
+	Containers map[string]json.RawMessage
+}
+
+type volumeInspect struct {
+	Name   string
+	Labels map[string]string
+}
+
+func (i *Inspector) inspectOwnership(ctx context.Context, executable string, report *core.DockerAwareness) ([]core.DockerOwnershipGroup, bool) {
+	imageIDs, imagesListed := i.listIdentifiers(ctx, executable, report, "images for ownership", "ID", "image", "ls", "--all", "--format", "json")
+	containerIDs, containersListed := i.listIdentifiers(ctx, executable, report, "containers for relationships", "ID", "container", "ls", "--all", "--format", "json")
+	networkIDs, networksListed := i.listIdentifiers(ctx, executable, report, "custom networks for ownership", "ID", "network", "ls", "--filter", "type=custom", "--format", "json")
+	volumeNames, volumesListed := i.listIdentifiers(ctx, executable, report, "volumes for ownership", "Name", "volume", "ls", "--format", "json")
+
+	imageRows, imagesInspected := i.inspectRows(ctx, executable, report, "images for ownership", []string{"image", "inspect"}, imageIDs)
+	containerRows, containersInspected := i.inspectRows(ctx, executable, report, "containers for relationships", []string{"container", "inspect"}, containerIDs)
+	networkRows, networksInspected := i.inspectRows(ctx, executable, report, "custom networks for ownership", []string{"network", "inspect"}, networkIDs)
+	volumeRows, volumesInspected := i.inspectRows(ctx, executable, report, "volumes for ownership", []string{"volume", "inspect"}, volumeNames)
+	containerRelationshipsAvailable := containersListed && containersInspected
+	ownershipComplete := imagesListed && imagesInspected && containersListed && containersInspected && networksListed && networksInspected && volumesListed && volumesInspected
+
+	containers := make([]containerInspect, 0, len(containerRows))
+	imageReferences := make(map[string]uint64)
+	volumeMounts := make(map[string]uint64)
+	for _, row := range containerRows {
+		var value containerInspect
+		if err := json.Unmarshal(row, &value); err != nil || value.ID == "" {
+			containerRelationshipsAvailable = false
+			ownershipComplete = false
+			report.Warnings = append(report.Warnings, "Docker returned a malformed container inspect row; dependent relationship counts are unavailable.")
+			continue
+		}
+		containers = append(containers, value)
+		if value.Image != "" {
+			imageReferences[value.Image]++
+		}
+		for _, mount := range value.Mounts {
+			if mount.Type == "volume" && mount.Name != "" {
+				volumeMounts[mount.Name]++
+			}
+		}
+	}
+
+	observations := make([]core.DockerScopedResource, 0, len(imageRows)+len(containers)+len(networkRows)+len(volumeRows))
+	for _, row := range imageRows {
+		var value imageInspect
+		if err := json.Unmarshal(row, &value); err != nil || value.ID == "" {
+			ownershipComplete = false
+			report.Warnings = append(report.Warnings, "Docker returned a malformed image inspect row; that image was not grouped.")
+			continue
+		}
+		name := shortID(value.ID)
+		if len(value.RepoTags) > 0 && value.RepoTags[0] != "<none>:<none>" {
+			name = value.RepoTags[0]
+		}
+		observations = append(observations, scopedResource(value.ID, "image", name, value.Config.Labels, false, core.RiskReview,
+			relationship("container-references", imageReferences[value.ID], containerRelationshipsAvailable), ""))
+	}
+	for _, value := range containers {
+		if !isStoppedState(value.State.Status) {
+			continue
+		}
+		observations = append(observations, scopedResource(value.ID, "stopped-container", strings.TrimPrefix(value.Name, "/"), value.Config.Labels, false, core.RiskReview,
+			append(
+				relationship("networks", uint64(len(value.NetworkSettings.Networks)), true),
+				relationship("mounts", uint64(len(value.Mounts)), true)...,
+			), value.Image))
+	}
+	for _, row := range networkRows {
+		var value networkInspect
+		if err := json.Unmarshal(row, &value); err != nil || value.ID == "" {
+			ownershipComplete = false
+			report.Warnings = append(report.Warnings, "Docker returned a malformed network inspect row; that network was not grouped.")
+			continue
+		}
+		observations = append(observations, scopedResource(value.ID, "network", value.Name, value.Labels, false, core.RiskReview,
+			relationship("container-attachments", uint64(len(value.Containers)), true), ""))
+	}
+	for _, row := range volumeRows {
+		var value volumeInspect
+		if err := json.Unmarshal(row, &value); err != nil || value.Name == "" {
+			ownershipComplete = false
+			report.Warnings = append(report.Warnings, "Docker returned a malformed volume inspect row; that volume was not grouped.")
+			continue
+		}
+		observations = append(observations, scopedResource(value.Name, "volume", value.Name, value.Labels, true, core.RiskDanger,
+			relationship("container-mounts", volumeMounts[value.Name], containerRelationshipsAvailable), ""))
+	}
+	return groupOwnership(observations), ownershipComplete
+}
+
+func (i *Inspector) listIdentifiers(ctx context.Context, executable string, report *core.DockerAwareness, label, field string, args ...string) ([]string, bool) {
+	output, err := i.runner.Run(ctx, executable, args...)
+	if err != nil {
+		report.Warnings = append(report.Warnings, fmt.Sprintf("Could not inspect %s: %v", label, err))
+		return nil, false
+	}
+	seen := make(map[string]struct{})
+	values := make([]string, 0)
+	for _, line := range nonEmptyLines(output) {
+		var row map[string]json.RawMessage
+		if err := json.Unmarshal([]byte(line), &row); err != nil {
+			report.Warnings = append(report.Warnings, fmt.Sprintf("Docker returned malformed JSON while listing %s.", label))
+			return values, false
+		}
+		var value string
+		if err := json.Unmarshal(row[field], &value); err != nil || value == "" {
+			report.Warnings = append(report.Warnings, fmt.Sprintf("Docker did not return an identifier while listing %s.", label))
+			return values, false
+		}
+		if _, exists := seen[value]; !exists {
+			seen[value] = struct{}{}
+			values = append(values, value)
+		}
+	}
+	return values, true
+}
+
+func (i *Inspector) inspectRows(ctx context.Context, executable string, report *core.DockerAwareness, label string, command []string, identifiers []string) ([]json.RawMessage, bool) {
+	rows := make([]json.RawMessage, 0, len(identifiers))
+	complete := true
+	for start := 0; start < len(identifiers); start += inspectBatchSize {
+		end := min(start+inspectBatchSize, len(identifiers))
+		args := append(append([]string{}, command...), "--format", "{{json .}}")
+		args = append(args, identifiers[start:end]...)
+		output, err := i.runner.Run(ctx, executable, args...)
+		if err != nil {
+			report.Warnings = append(report.Warnings, fmt.Sprintf("Could not inspect %s: %v", label, err))
+			complete = false
+			continue
+		}
+		for _, line := range nonEmptyLines(output) {
+			if !json.Valid([]byte(line)) {
+				report.Warnings = append(report.Warnings, fmt.Sprintf("Docker returned malformed inspect data for %s.", label))
+				complete = false
+				continue
+			}
+			rows = append(rows, json.RawMessage(line))
+		}
+	}
+	return rows, complete
+}
+
+func scopedResource(id, kind, name string, rawLabels map[string]string, stateful bool, risk core.RiskLevel, relationships []core.DockerRelationshipObservation, relatedID string) core.DockerScopedResource {
+	labels := composeLabels(rawLabels)
+	scope := "unscoped"
+	if validComposeScope(kind, labels) {
+		scope = "compose-project"
+	}
+	return core.DockerScopedResource{
+		ID: id, Kind: kind, Name: name, Scope: scope, Labels: labels, Relationships: relationships,
+		RelatedResourceID: relatedID, Stateful: stateful, Risk: risk,
+	}
+}
+
+func validComposeScope(kind string, labels core.DockerComposeLabels) bool {
+	if !composeProjectPattern.MatchString(labels.Project) {
+		return false
+	}
+	for _, value := range []string{labels.Service, labels.Network, labels.Volume} {
+		if value != "" && strings.TrimSpace(value) != value {
+			return false
+		}
+	}
+	switch kind {
+	case "image", "stopped-container":
+		return labels.Network == "" && labels.Volume == ""
+	case "network":
+		return labels.Service == "" && labels.Volume == ""
+	case "volume":
+		return labels.Service == "" && labels.Network == ""
+	default:
+		return false
+	}
+}
+
+func composeLabels(labels map[string]string) core.DockerComposeLabels {
+	return core.DockerComposeLabels{
+		Project: labels["com.docker.compose.project"],
+		Service: labels["com.docker.compose.service"],
+		Network: labels["com.docker.compose.network"],
+		Volume:  labels["com.docker.compose.volume"],
+	}
+}
+
+func relationship(kind string, count uint64, available bool) []core.DockerRelationshipObservation {
+	return []core.DockerRelationshipObservation{{Kind: kind, Count: count, Available: available}}
+}
+
+func groupOwnership(resources []core.DockerScopedResource) []core.DockerOwnershipGroup {
+	projects := make(map[string][]core.DockerScopedResource)
+	unscoped := make([]core.DockerScopedResource, 0)
+	for _, item := range resources {
+		if item.Scope == "compose-project" {
+			projects[item.Labels.Project] = append(projects[item.Labels.Project], item)
+		} else {
+			unscoped = append(unscoped, item)
+		}
+	}
+	projectNames := make([]string, 0, len(projects))
+	for project := range projects {
+		projectNames = append(projectNames, project)
+	}
+	sort.Strings(projectNames)
+	groups := make([]core.DockerOwnershipGroup, 0, len(projectNames)+1)
+	for _, project := range projectNames {
+		items := projects[project]
+		sortScopedResources(items)
+		groups = append(groups, core.DockerOwnershipGroup{Scope: "compose-project", Project: project, Resources: items})
+	}
+	sortScopedResources(unscoped)
+	groups = append(groups, core.DockerOwnershipGroup{Scope: "unscoped", Resources: unscoped})
+	return groups
+}
+
+func sortScopedResources(resources []core.DockerScopedResource) {
+	sort.Slice(resources, func(left, right int) bool {
+		if resources[left].Kind == resources[right].Kind {
+			return resources[left].Name < resources[right].Name
+		}
+		return resources[left].Kind < resources[right].Kind
+	})
+}
+
+func isStoppedState(state string) bool {
+	return state == "created" || state == "exited" || state == "dead"
+}
+
+func shortID(id string) string {
+	id = strings.TrimPrefix(id, "sha256:")
+	if len(id) > 12 {
+		return id[:12]
+	}
+	return id
 }
 
 func resource(kind, name string, usage diskUsageRow, boundary string) core.DockerResourceSummary {

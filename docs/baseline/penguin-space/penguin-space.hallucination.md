@@ -4,7 +4,7 @@ pack: "penguin-space"
 document: "hallucination"
 status: "active"
 updated: "2026-08-13"
-code_ref: "114a64b + M3.2 runtime evidence (no code change)"
+code_ref: "HEAD (M3.3 read-only ownership presentation phase commit)"
 ---
 
 # Decisions, unknowns, and claim boundaries
@@ -17,17 +17,18 @@ code_ref: "114a64b + M3.2 runtime evidence (no code change)"
 - `out/penguinspace-v0.1.1.exe` was built with explicit version `0.1.1`, preserving `out/penguinspace-v0.1.0.exe` and `out/penguinspace.exe`.
 - The user confirmed the `v0.1.1` Windows UI behavior: only available host providers receive Inspect cards; pnpm without `storeDir` is a setup notice; unavailable tools are collapsed; and project providers are absent before selecting a workspace.
 - M3.1 source implements a fixed read-only Docker CLI sequence and a five-category UI. Docker verification passed 12 service methods and 19 models plus frontend build, gofmt, vet, tests, and Windows cross-build. `out/penguinspace-v0.1.2.exe` (13,789,696 bytes; SHA-256 `ffbe4ded8f938d9cf9ca09f3cbba883487c30a3a7712f30a75410392a53923ce`) passed user-confirmed Windows acceptance: daemon-available rendering showed exactly five categories with Stateful volumes and no cleanup control; after Rancher Desktop stopped, refresh reported daemon unavailable and removed all resource cards without stale data.
+- M3.3 implements exact Compose-label grouping with explicit `unscoped`, ID-backed relationship observations, incomplete-snapshot signaling, and selected-builder BuildKit records. Final Docker verification passed 12 service methods, 7 enums, 25 models, Vue type-check/build, formatting, vet, internal tests, and Windows cross-build. Live read-only inspection found projects `docker` and `penguinspacestudio`, one unscoped image, no containers, two unattached networks, ten unmounted volumes, and 40 BuildKit records/22 shared. This is not Windows visual acceptance.
 
 **Decisions now in force**
 
 - Developer-provider discovery is capability-first: its startup detection is bounded and read-only; it must not measure bytes, issue a cleanup plan, or execute cleanup. M3.1 Docker awareness is a separate read-only observation path that may request daemon-wide measurements.
 - A host-only provider must not claim to inspect a toolchain or cache held only inside Docker. The Docker-first IRYS Rust project is therefore outside the Cargo host-provider scope.
 - Windows packaging requires an explicit semantic version and produces `out/penguinspace-v<version>.exe`. Existing artifacts and a potentially running executable are never overwritten automatically.
-- M3.1 Docker awareness is observation-only. The backend may invoke only fixed version/list/disk-usage commands; it accepts no frontend Docker argument and exposes no plan or executor. `docker system prune`, `docker builder prune`, and volume cleanup remain unauthorized.
+- M3.3 Docker awareness remains observation-only. The backend invokes only fixed version/list/disk-usage/builder-usage commands plus bounded inspect calls whose IDs/names come from those backend-owned lists; it accepts no frontend Docker argument and exposes no plan or executor. `docker system prune`, `docker builder prune`, resource removal, and volume cleanup remain unauthorized.
 
 **Open questions and required evidence**
 
-- M3.1 daemon-available and daemon-unavailable Windows behavior is runtime-confirmed. M3.2 permits canonical Compose labels for read-only grouping only; cleanup semantics remain unresolved and must not be inferred from labels, counts, or disk-usage summaries.
+- M3.1 daemon-available and daemon-unavailable Windows behavior is runtime-confirmed. M3.3 implements the M3.2 grouping decision, but its new ownership UI has not yet received Windows visual acceptance. Cleanup semantics remain unresolved and must not be inferred from labels, counts, relationships, or disk-usage summaries.
 - BuildKit is confirmed selected-builder scope with shared records and no canonical project identity; project attribution is prohibited pending new evidence.
 - Docker volumes are groupable for observability but remain persistent-state candidates requiring a separate Danger workflow plus real recovery/verification evidence before any cleanup is enabled.
 - Stopped-container grouping by canonical labels is decided but still lacks a live runtime fixture; absent labels always remain unscoped.
@@ -47,7 +48,7 @@ code_ref: "114a64b + M3.2 runtime evidence (no code change)"
 
 **Decision:** canonical Compose labels are sufficient metadata for read-only presentation grouping, not ownership proof or cleanup authorization. Labels are static for an object's lifetime but still metadata; no name-prefix inference is allowed. Every absent, conflicting, or malformed label produces an explicit unscoped group. Relationship counts are observations and must be revalidated from Docker IDs. BuildKit remains outside project grouping. Volumes remain Stateful/Danger without exception.
 
-**Follow-on:** M3.3 may implement only these read-only grouping and relationship fields. Docker cleanup semantics, image shared-layer reclaim, a stopped-container fixture, and volume recovery remain open.
+**Follow-on:** M3.3 now implements only these read-only grouping and relationship fields, including fail-closed incomplete-snapshot handling. Windows visual acceptance, Docker cleanup semantics, image shared-layer reclaim, a stopped-container fixture, and volume recovery remain open.
 
 ## Closed decisions
 

@@ -4,7 +4,7 @@ pack: "penguin-space"
 document: "introduction"
 status: "active"
 updated: "2026-08-13"
-code_ref: "114a64b + M3.2 runtime evidence (no code change)"
+code_ref: "HEAD (M3.3 read-only ownership presentation phase commit)"
 ---
 
 # PenguinSpace baseline
@@ -40,7 +40,7 @@ It is not a generic PC cleaner or merely a GUI for cache-clearing commands. Its 
 - Milestone 1 bootstrap implementation is committed in `5ba3fe8`: a pinned Docker toolchain, Wails/Go/Vue shell, SQLite history store, and a fixture-only provider lifecycle.
 - The M1 elevation probe is committed in `6ee788d`: it has a fixed action allow-list, per-operation Windows `runas` launcher, cancellation and timeout states, and a UI control. Docker verification, Windows cross-build, and a hidden process-start smoke test passed. On 2026-08-11 the user exercised the visible UI and observed the no-op probe reach `Succeeded`; it still has no cleanup provider or arbitrary shell-command channel.
 - The root `PROPOSAL.md`, which was an already staged newly added file, was removed after byte-identical preservation in this pack.
-- Product decisions are approved direction, not runtime proof. Implemented evidence includes the M1 fixture/elevation, all bounded M2 provider slices, and M3.1 read-only Docker awareness. M3.1 detects the daemon and independently reports images, stopped containers, BuildKit cache, custom networks, and volumes; it exposes no cleanup plan or mutation. Docker cleanup, WSL/VHDX operations, packaging, and release behaviour remain planned or deferred as recorded in the roadmap.
+- Product decisions are approved direction, not runtime proof. Implemented evidence includes the M1 fixture/elevation, all bounded M2 provider slices, and M3.3 read-only Docker ownership presentation. M3.3 retains five daemon-wide categories and adds exact Compose-label project/unscoped grouping, ID-backed relationships, incomplete-snapshot signaling, and selected-builder BuildKit scope; it exposes no cleanup plan or mutation. Docker cleanup, WSL/VHDX operations, packaging, and release behaviour remain planned or deferred as recorded in the roadmap.
 - Docker-only verification and Windows cross-build pass through Compose. The generated Windows executable launched successfully for five seconds on the host in a hidden smoke test, then was stopped; this is process-start evidence, not interactive UI acceptance.
 - The fixture lifecycle scans, plans, requires confirmation, executes only an in-memory change, verifies exact reclaimed bytes, and persists a history record. It is not an implementation of any real cleanup provider or command.
 - Commit `d0bc468` upgrades the no-op elevation request to contract version 2 and activates its bounded 30-second execution window only after the Windows launcher returns successfully. The helper waits for that activation, so operator consent time no longer consumes execution time; repeated regression tests cover slow consent, timeout after consent, refusal mapping, cancellation, and allow-list validation. Docker `verify` and `build` passed and produced `out/penguinspace.exe` (13,556,736 bytes; SHA-256 `f606c7a33c6ee13856db965cea2193c2e43197018fee30b6bbf078921125c4f1`). On the Windows host with UAC set to Never notify, the rebuilt executable reached `Succeeded`, `Cancelled`, and `Timed-Out`; its visible fixture lifecycle completed 3.00 MiB through scan, plan, backend confirmation, no-filesystem execution, and verification. Interactive refusal remains unverified because this host configuration auto-approves `runas` without presenting a rejectable prompt.
@@ -68,6 +68,16 @@ It is not a generic PC cleaner or merely a GUI for cache-clearing commands. Its 
 - M3.2 read-only evidence on the restarted daemon found canonical Compose project/service labels on the two toolchain images, project/resource labels on both custom networks and all ten volumes, and no labels on the Rancher proxy image. No containers existed; networks had no attachments and volumes had no mounts. The selected builder reported 40 cache records, 22 shared, without project identity.
 - Decision: exact canonical Compose labels may group images, containers, networks, and volumes for observation only; missing or malformed labels are explicitly unscoped and names are never inferred as ownership. BuildKit stays selected-builder scope. Volumes remain Stateful/Danger even when labeled and unmounted.
 - The next ready scope is M3.3 read-only ownership presentation. Docker cleanup semantics, image shared-layer reclaim, a stopped-container runtime fixture, and volume recovery remain open and block destructive Docker work.
+
+## Save checkpoint — M3.3 read-only ownership presentation
+
+**Code reference:** this M3.3 phase commit.
+
+- `DockerAwareness` now keeps daemon-wide totals separate from ID-backed ownership observations. Exact valid `com.docker.compose.project` labels form project groups; absent, malformed, or resource-type-conflicting canonical labels remain in an explicit `unscoped` group without name/tag/path inference.
+- Images expose current all-container reference counts; stopped containers expose image ID plus network and mount counts; custom networks expose attachment counts; volumes expose mount counts and remain Stateful/Danger even at zero. Every relationship count has an availability flag, and a partial list/inspect result marks the ownership snapshot incomplete rather than silently converting missing data to zero or unscoped.
+- BuildKit is rendered separately as `selected-builder`, with ID-backed shared/mutable/reclaimable record metadata and no project attribution. The UI provides observation tags only; no Docker cleanup, prune, delete, review, plan, or executor was added.
+- Final `docker compose run --rm verify` passed Wails binding generation (12 methods, 7 enums, 25 models), Vue type-check/build, formatting, vet, all internal tests, and Windows production cross-build. A live read-only check against Docker Engine 29.5.3 observed projects `docker` and `penguinspacestudio`, one unscoped image, zero containers, two unattached custom networks, ten unmounted volumes, and 40 selected-builder records including 22 shared.
+- This is implementation and live-daemon data verification, not Windows visual acceptance or cleanup authorization. The stopped-container runtime fixture, Docker cleanup semantics, shared-layer reclaim, volume recovery, and any destructive flow remain open.
 
 ## Storage model
 

@@ -181,11 +181,62 @@ type DockerResourceSummary struct {
 	Boundary       string      `json:"boundary"`
 }
 
+type DockerComposeLabels struct {
+	Project string `json:"project,omitempty"`
+	Service string `json:"service,omitempty"`
+	Network string `json:"network,omitempty"`
+	Volume  string `json:"volume,omitempty"`
+}
+
+type DockerRelationshipObservation struct {
+	Kind      string `json:"kind"`
+	Count     uint64 `json:"count"`
+	Available bool   `json:"available"`
+}
+
+type DockerScopedResource struct {
+	ID                string                          `json:"id"`
+	Kind              string                          `json:"kind"`
+	Name              string                          `json:"name"`
+	Scope             string                          `json:"scope"`
+	Labels            DockerComposeLabels             `json:"labels"`
+	Relationships     []DockerRelationshipObservation `json:"relationships"`
+	RelatedResourceID string                          `json:"relatedResourceId,omitempty"`
+	Stateful          bool                            `json:"stateful"`
+	Risk              RiskLevel                       `json:"risk"`
+}
+
+type DockerOwnershipGroup struct {
+	Scope     string                 `json:"scope"`
+	Project   string                 `json:"project,omitempty"`
+	Resources []DockerScopedResource `json:"resources"`
+}
+
+type DockerBuildCacheRecord struct {
+	ID          string `json:"id"`
+	Shared      bool   `json:"shared"`
+	Mutable     bool   `json:"mutable"`
+	Reclaimable bool   `json:"reclaimable"`
+}
+
+type DockerBuilderScope struct {
+	Scope          string                   `json:"scope"`
+	Name           string                   `json:"name"`
+	Count          uint64                   `json:"count"`
+	CountAvailable bool                     `json:"countAvailable"`
+	SharedCount    uint64                   `json:"sharedCount"`
+	Records        []DockerBuildCacheRecord `json:"records"`
+	Boundary       string                   `json:"boundary"`
+}
+
 type DockerAwareness struct {
-	Daemon      DockerDaemonStatus      `json:"daemon"`
-	InspectedAt time.Time               `json:"inspectedAt"`
-	Resources   []DockerResourceSummary `json:"resources"`
-	Warnings    []string                `json:"warnings"`
+	Daemon            DockerDaemonStatus      `json:"daemon"`
+	InspectedAt       time.Time               `json:"inspectedAt"`
+	Resources         []DockerResourceSummary `json:"resources"`
+	OwnershipGroups   []DockerOwnershipGroup  `json:"ownershipGroups"`
+	OwnershipComplete bool                    `json:"ownershipComplete"`
+	Builder           DockerBuilderScope      `json:"builder"`
+	Warnings          []string                `json:"warnings"`
 }
 
 type Dashboard struct {

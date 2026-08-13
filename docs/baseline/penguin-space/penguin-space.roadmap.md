@@ -4,7 +4,7 @@ pack: "penguin-space"
 document: "roadmap"
 status: "active"
 updated: "2026-08-13"
-code_ref: "114a64b + M3.2 runtime evidence (no code change)"
+code_ref: "HEAD (M3.3 read-only ownership presentation phase commit)"
 ---
 
 # Product roadmap and verification state
@@ -18,7 +18,7 @@ code_ref: "114a64b + M3.2 runtime evidence (no code change)"
 | Architecture and usage contract | Complete | Source-code and use-guide documents created because the proposal defines both materially |
 | Root proposal deletion | Complete | Root source removed after SHA-256 equality and pack-coverage verification |
 | Phase 0 — Research and decision closure | Complete with scoped deferrals | Nine decisions were resolved or explicitly deferred in the Phase 0 register; Docker-only toolchain spike passed without a host SDK |
-| Product implementation | M1 complete with two scoped environment deferrals; M2 complete; M3.1 read-only Docker awareness accepted on Windows | Eleven developer-tool lifecycles and discovery-first UI are complete. Docker daemon awareness reports five independent resource classes without cleanup; `v0.1.2` acceptance passed with the daemon both available and unavailable. |
+| Product implementation | M1 complete with two scoped environment deferrals; M2 complete; M3.3 read-only Docker ownership presentation implemented and Docker-verified | Eleven developer-tool lifecycles and discovery-first UI are complete. Docker now reports five daemon-wide resource classes plus exact Compose-label project/unscoped grouping, ID-backed relationships, and selected-builder BuildKit scope without cleanup. |
 
 ## Phase 0 — Research and decision closure
 
@@ -98,6 +98,8 @@ Implement Docker/Docker Desktop/Rancher awareness; independent resource inspecti
 
 **M3.2 ownership/scoping evidence checkpoint (2026-08-13):** Rancher Desktop was restarted by the operator and read-only inspection ran against Docker Engine 29.5.3 and the default BuildKit v0.30.0 builder. Of three images, the PenguinSpace and IRYS toolchain images carried canonical Compose project/service labels; the Rancher proxy image was unscoped. Both custom networks and all ten volumes carried `com.docker.compose.project` plus their resource-specific logical-name labels. No containers existed, both custom networks had no attachments, and no volume was mounted by a container. The selected builder exposed 40 cache records, including 22 marked shared, with no canonical Compose project identity. Decision: canonical Compose labels may group images, containers, networks, and volumes for read-only presentation only; absent/malformed labels remain unscoped and names are never used as ownership fallback. Relationships must be re-read from IDs, network attachments, and volume mounts. BuildKit remains builder-scoped and unassigned to projects. Volumes remain Danger even when labeled and unmounted. No cleanup authorization follows from this evidence.
 
+**M3.3 implementation checkpoint (2026-08-13):** `DockerAwareness` adds exact-label project groups, an always-present `unscoped` group, ID-backed resource observations, per-relationship availability, an ownership-completeness flag, and a separate selected-builder BuildKit scope. Bounded Docker inspect batches derive image container references, stopped-container image/network/mount relationships, custom-network attachments, and volume mounts. Valid Compose grouping requires a canonical project name and non-conflicting labels for the resource type; missing/malformed/conflicting values fail closed to `unscoped`. Partial list or inspect failures emit warnings, make dependent counts unavailable, and mark the snapshot incomplete rather than presenting omissions as zero. Vue renders daemon totals separately from ownership groups, marks volumes Stateful/Danger, and exposes no cleanup control. Final `docker compose run --rm verify` passed bindings (12 methods, 7 enums, 25 models), Vue type-check/build, gofmt, vet, all internal tests, and Windows cross-build. Live read-only evidence remained 3 images, 0 containers, 2 unattached custom networks, 10 unmounted volumes, projects `docker` and `penguinspacestudio`, 1 unscoped image, and 40 selected-builder records/22 shared. Semantic review found no Critical/High issue; its two Medium completeness/label-validation findings were fixed before this checkpoint. No stopped-container fixture or Windows visual acceptance was created.
+
 ## Milestone 4 — Project storage
 
 **Depends on:** Milestone 1 scanner and workspace configuration.
@@ -141,7 +143,7 @@ Cover failure recovery, locked files, permission failures, malformed output, par
 
 ## Exact next action
 
-Implement M3.3 as read-only ownership presentation. Extend Docker observation models to expose canonical Compose project/resource labels, an explicit scoped/unscoped status, and current relationship counts for images, stopped containers, custom networks, and volumes. Keep BuildKit at selected-builder scope with no project attribution; keep volumes Stateful/Danger regardless of labels or mount count. Do not add cleanup, prune, delete, or volume mutation.
+Build the next explicit versioned Windows artifact, then run M3.3 visual acceptance with the daemon available and unavailable. Confirm that daemon totals remain separate, projects `docker` and `penguinspacestudio` and the explicit `unscoped` group render correctly, BuildKit is selected-builder only, every volume remains Stateful/Danger, partial/unavailable observations do not appear as zero, and refresh removes stale ownership cards. Do not create a stopped-container fixture or add Docker cleanup without a separate approved evidence task.
 
 ## Save checkpoint — 2026-08-13
 
@@ -150,7 +152,7 @@ This checkpoint supersedes the earlier **Exact next action** acceptance instruct
 - **M2 discovery-first UI:** complete and user-confirmed. Available host providers render as full cards, pnpm without explicit `storeDir` is a configuration notice, unavailable tools are collapsed, and project provider cards remain absent until a matching approved workspace exists.
 - **Build evidence:** `d97fa27`; `docker compose run --rm verify` passed bindings (11 methods/16 models), Vue typecheck/build, gofmt, vet, internal tests, and Windows cross-build. `scripts/build-windows.ps1 -Version 0.1.1` produced `out/penguinspace-v0.1.1.exe` without overwriting prior artifacts.
 - **Boundary confirmed:** IRYS is Docker-first. Its Cargo project/build cache is not observable through the host-only Cargo provider; this is expected behavior, not an M2 detection defect.
-- **Next implementation action:** M3.1 is accepted and M3.2 ownership/scoping evidence is closed. M3.3 may implement read-only grouping by canonical Compose labels with explicit unscoped fallbacks and relationship counts; BuildKit remains builder-wide and volumes remain Stateful/Danger.
+- **Next implementation action:** M3.3 read-only ownership presentation is implemented and Docker-verified. The next gate is a versioned Windows visual acceptance run for project/unscoped grouping, selected-builder scope, Stateful/Danger volumes, daemon unavailable refresh, and incomplete-snapshot messaging before any later Docker scope is opened.
 - **Still unverified:** Docker cleanup semantics; image shared-layer reclaim; stopped-container label behavior on a live fixture; volume recovery; UAC refusal; and optional host-native visual acceptance for Cargo/Gradle/Maven/Playwright.
 
 ## Pack migration verification
