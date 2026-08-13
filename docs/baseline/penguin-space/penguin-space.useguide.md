@@ -3,13 +3,13 @@ baseline_schema: "2.0"
 pack: "penguin-space"
 document: "useguide"
 status: "draft"
-updated: "2026-08-12"
-code_ref: "uncommitted"
+updated: "2026-08-13"
+code_ref: "1f7098c"
 ---
 
 # Intended product interaction contract
 
-This is the Product Goal interaction contract. M1 implements its left-navigation shell, fixture lifecycle, and partially runtime-verified Windows UAC probe. The current uncommitted M2 working tree adds reusable Developer Tools workflows for Bun, npm, a conditional pnpm slice, and uv; every other provider and complete product page remains planned.
+This is the Product Goal interaction contract. M1 implements its left-navigation shell, fixture lifecycle, and partially runtime-verified Windows UAC probe. Commit `1f7098c` adds reusable Developer Tools workflows for Bun, npm, conditional pnpm, uv, Yarn Classic, NuGet HTTP cache, and Cypress binary cache. Cargo, Gradle, Maven, and Playwright remain planned because their cleanup requires explicit project/workspace scope from M4; no provider may substitute a broad user-home deletion.
 
 The UAC panel's **Test Windows consent** action is a fixed no-op probe, not a cleanup request. Commit `8fc559a` disables every start action immediately while a start is pending or active, so a second click cannot surface the previous stale `already in progress` error. Commit `d0bc468` starts the bounded execution window only after Windows elevation launches. **Test cancellation** starts a delayed no-op; select **Cancel probe** while it is active. **Test timeout** outlives the fixed execution window and ends as `timed-out`. On 2026-08-12, computer-controlled acceptance against the rebuilt executable observed `Succeeded`, `Cancelled`, and `Timed-Out`, each with explicit no-cleanup wording where applicable. These controls still cannot invoke a cleanup provider or shell command.
 
@@ -37,7 +37,13 @@ The npm card uses the same review contract for npm 10/11 but is Review/Download 
 
 The pnpm card supports pnpm 11/12 and must distinguish detection from actionable support. Without an explicit absolute `storeDir`, it explains that pnpm's default stores are per disk and that project-root drive context is deferred to M4; it shows no measured size, no estimate, and no review button. With an explicit `storeDir`, it shows the versioned store's observed logical size, labels the reclaim estimate unavailable, and offers a Safe/Download review for `pnpm store prune`. Confirmation is still mandatory. After execution, the card reports the before/after difference as verified logical bytes; it must never relabel the entire pre-prune store as reclaimable.
 
-The uv card supports uv 0.12.x. **Inspect uv cache** resolves the actual cache location and shows its total observed size, but labels the pre-prune reclaim estimate unavailable because `uv cache prune` decides what is unused. The Safe/Download consequence must disclose that prune also removes all cached centralized project environments, which will be recreated, and that future work may download packages or rebuild source distributions. Review and explicit confirmation remain mandatory. Windows acceptance detected uv 0.12.1, displayed 3.45 GiB, opened review, and cancelled with the measurement intact; the real user cache was not pruned. The common command runner has since been patched to suppress child console windows, but the operator must still repeat this inspection once and confirm that no Windows Terminal window flashes.
+The uv card supports uv 0.12.x. **Inspect uv cache** resolves the actual cache location and shows its total observed size, but labels the pre-prune reclaim estimate unavailable because `uv cache prune` decides what is unused. The Safe/Download consequence must disclose that prune also removes all cached centralized project environments, which will be recreated, and that future work may download packages or rebuild source distributions. Review and explicit confirmation remain mandatory. Windows acceptance detected uv 0.12.1, displayed 3.45 GiB, opened review, and cancelled with the measurement intact; the real user cache was not pruned. The common command runner suppresses child console windows; the 2026-08-13 Windows inspection observed no Windows Terminal or console flash.
+
+The Yarn Classic card supports only version 1.x. **Inspect Yarn cache** resolves the global cache with `yarn cache dir`; **Confirm and clear** invokes only `yarn cache clean`, after revalidating that same global location. It is Review/Download because packages may need downloading again. Yarn modern cache modes are explicitly not inspected or cleaned because they can be project-local or shared and need M4 workspace scope.
+
+The NuGet card supports .NET SDK 6 or later. **Inspect NuGet HTTP cache** lists and measures only the `http-cache` root; **Confirm and clear** invokes only `dotnet nuget locals http-cache --clear`. It is Safe/Download. Global packages, temporary resources, and plugins cache are excluded and must never be presented as part of this action.
+
+The Cypress card supports versions 13 through 15. **Inspect Cypress cache** resolves the binary cache with `cypress cache path`, shows its total observed size, and labels the pre-prune reclaim estimate unavailable. **Confirm and prune** invokes only `cypress cache prune`, which retains the version in use while removing other cached binaries. It is Safe/Download; Cypress App Data and project dependencies remain outside this action.
 
 ## Home contract
 

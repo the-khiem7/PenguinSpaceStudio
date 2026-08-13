@@ -197,6 +197,30 @@ function recordProviderDetection(payload: { providerId: string; label: string; d
           description="Prunes unused entries and centralized project environments. Total cache bytes are observable, but reclaimable bytes remain unavailable before execution."
           @detection="recordProviderDetection"
         />
+        <ProviderCard
+          provider-id="yarn.classic-global-cache"
+          provider-label="Yarn Classic"
+          title="Yarn Classic global cache"
+          inspect-label="Inspect Yarn cache"
+          description="Supports only Yarn Classic 1.x global cache. Modern Yarn's project-local and shared-cache modes remain outside this action."
+          @detection="recordProviderDetection"
+        />
+        <ProviderCard
+          provider-id="nuget.http-cache"
+          provider-label="NuGet"
+          title="NuGet HTTP cache"
+          inspect-label="Inspect NuGet HTTP cache"
+          description="Clears only HTTP-request metadata. Global packages, temporary data, and plugin caches are deliberately outside this safe action."
+          @detection="recordProviderDetection"
+        />
+        <ProviderCard
+          provider-id="cypress.binary-cache"
+          provider-label="Cypress"
+          title="Cypress binary cache"
+          inspect-label="Inspect Cypress cache"
+          description="Prunes older downloaded Cypress binaries while retaining the binary currently in use. The observed total is not a reclaim estimate."
+          @detection="recordProviderDetection"
+        />
       </section>
     </section>
   </main>

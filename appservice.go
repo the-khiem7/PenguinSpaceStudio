@@ -12,9 +12,12 @@ import (
 	"github.com/the-khiem7/PenguinSpaceStudio/internal/elevation"
 	"github.com/the-khiem7/PenguinSpaceStudio/internal/history"
 	bunprovider "github.com/the-khiem7/PenguinSpaceStudio/internal/providers/bun"
+	cypressprovider "github.com/the-khiem7/PenguinSpaceStudio/internal/providers/cypress"
 	npmprovider "github.com/the-khiem7/PenguinSpaceStudio/internal/providers/npm"
+	nugetprovider "github.com/the-khiem7/PenguinSpaceStudio/internal/providers/nuget"
 	pnpmprovider "github.com/the-khiem7/PenguinSpaceStudio/internal/providers/pnpm"
 	uvprovider "github.com/the-khiem7/PenguinSpaceStudio/internal/providers/uv"
+	yarnprovider "github.com/the-khiem7/PenguinSpaceStudio/internal/providers/yarn"
 )
 
 type AppService struct {
@@ -43,10 +46,13 @@ func NewAppService() (*AppService, error) {
 		history:      store,
 		elevation:    elevation.NewController(elevationStore, newElevationLauncher(), 30*time.Second),
 		providers: map[string]core.Provider{
-			bunprovider.ProviderID:  bunprovider.NewSystemProvider(),
-			npmprovider.ProviderID:  npmprovider.NewSystemProvider(),
-			pnpmprovider.ProviderID: pnpmprovider.NewSystemProvider(),
-			uvprovider.ProviderID:   uvprovider.NewSystemProvider(),
+			bunprovider.ProviderID:     bunprovider.NewSystemProvider(),
+			cypressprovider.ProviderID: cypressprovider.NewSystemProvider(),
+			nugetprovider.ProviderID:   nugetprovider.NewSystemProvider(),
+			npmprovider.ProviderID:     npmprovider.NewSystemProvider(),
+			pnpmprovider.ProviderID:    pnpmprovider.NewSystemProvider(),
+			uvprovider.ProviderID:      uvprovider.NewSystemProvider(),
+			yarnprovider.ProviderID:    yarnprovider.NewSystemProvider(),
 		},
 		providerPlans: make(map[string]core.CleanupPlan),
 	}, nil
@@ -59,7 +65,7 @@ func (s *AppService) Close() error {
 func (s *AppService) Dashboard() core.Dashboard {
 	return core.Dashboard{
 		ApplicationName: "PenguinSpace",
-		Stage:           "M2 Bun, npm, pnpm, and uv providers ready",
+		Stage:           "M2 Bun, npm, pnpm, uv, Yarn Classic, NuGet, and Cypress providers ready",
 		SafetyMessage:   "The fixture is no-op; real cleanup requires an inspected backend plan and explicit confirmation.",
 	}
 }
