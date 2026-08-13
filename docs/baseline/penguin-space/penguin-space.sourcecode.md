@@ -3,8 +3,8 @@ baseline_schema: "2.0"
 pack: "penguin-space"
 document: "sourcecode"
 status: "active"
-updated: "2026-08-13"
-code_ref: "HEAD (M3.4 Docker cleanup-semantics decision)"
+updated: "2026-08-14"
+code_ref: "HEAD (M3.5 exact Compose network removal)"
 ---
 
 # Architecture and implementation
@@ -52,7 +52,7 @@ The frontend contract is Vue 3 + TypeScript + Vite, using pinned Bun `1.3.14` as
 
 Measurements are stored as exact `uint64` byte values with a separate kind: `measured-logical`, `estimated-logical`, `measured-physical`, or `unavailable`. An observed total and an estimated reclaim are distinct fields, so a provider such as pnpm can truthfully show the store size without claiming those bytes are pruneable. Formatting into IEC units is a presentation concern only.
 
-The implemented store uses pure-Go `modernc.org/sqlite` `v1.56.0`. It creates a SQLite database at `%LOCALAPPDATA%\\PenguinSpace\\penguinspace.db` on Windows, creates the initial `cleanup_history` table, and records SQLite `user_version = 1`. It currently persists fixture history only; settings and complete plan/outcome persistence belong to later product surfaces, while retention and diagnostics belong to production hardening. The application does not open an untrusted database file as its own state.
+The implemented store uses pure-Go `modernc.org/sqlite` `v1.56.0`. It creates a SQLite database at `%LOCALAPPDATA%\\PenguinSpace\\penguinspace.db` on Windows. Schema version 2 adds `reclaimed_kind` beside exact reclaimed bytes; version-1 rows migrate with `measured-logical`, while a database whose `user_version` is newer than supported is rejected without modification. Fixture, developer-provider, and verified exact-network outcomes are persisted; a Docker network outcome records `unavailable` rather than treating zero bytes as a measured reclaim. Settings and complete plan/outcome persistence belong to later product surfaces, while retention and diagnostics belong to production hardening. The application does not open an untrusted database file as its own state.
 
 The desktop process remains non-elevated. Developer-tool cache cleanup runs without the M1 elevation helper and is guarded by an inspected backend-owned plan plus path revalidation. The implemented elevated helper remains limited to the M1 no-op probe. A privileged operation for another real provider remains planned: it must be a validated, narrowly scoped plan passed to a separate UAC `runas` helper and must not reuse this test-only probe contract.
 
@@ -94,9 +94,17 @@ BuildKit remains outside project groups. `docker builder du --format json` yield
 
 Final Compose verification regenerated 12-method/25-model bindings, passed Vue type-check/build, gofmt, vet, internal tests, and Windows production cross-build. Live read-only commands against Docker Engine 29.5.3 confirmed 3 images, 0 containers, projects `docker` and `penguinspacestudio`, 1 unscoped image, 2 custom networks with zero attachments, 10 volumes with zero mounts, and 40 selected-builder records including 22 shared. Windows UAT on `out/penguinspace-v0.1.3.exe` then confirmed the complete available presentation—including 8 `docker` resources, 6 `penguinspacestudio` resources, one explicit unscoped image, Stateful/Danger volumes, and selected-builder 40/22 shared/5 mutable metrics—and the unavailable refresh state with every prior Docker card removed. No cleanup control or mutation was exposed.
 
-## M3.4 cleanup-semantics boundary
+## M3.5 exact-network removal implementation
 
-M3.5 is limited to one exact custom network per reviewed plan. The planner requires a fresh complete ownership snapshot, valid Compose project/network labels, and an available zero attachment count. The backend retains the immutable network ID, re-inspects it immediately before execution, rejects missing/changed labels or any attachment, invokes only `docker network rm <ID>` without force, then verifies that exact ID is absent. It reports no reclaimed-byte claim. Images, stopped containers, BuildKit, volumes, broad prune, and multi-target commands remain unavailable. M3.6 may only enumerate WSL distros and backing VHDX metadata without shutdown, elevation, mount, optimization, or compaction.
+`internal/dockerinventory.NetworkRemovalController` retains one backend-issued plan at a time. `InspectDockerNetworkRemoval` accepts an exact network ID only as a review selector, then independently reruns the complete ownership snapshot. Eligibility requires a one-to-one set of list/inspect identities, valid canonical Compose project and network labels, and exactly one available zero-attachment relationship. Missing/null `Containers` metadata, malformed rows, partial batches, conflicting labels, and unscoped or attached networks cannot issue a plan.
+
+`ExecuteDockerNetworkRemoval` accepts the retained plan ID and explicit confirmation, consumes the plan, resolves Docker again, and immediately inspects that exact ID. Identity, name, project label, network label, and non-null zero attachments must still match. The only mutating invocation is `docker network rm <retained-ID>`; there is no force, prune, batch, name fallback, or path/argument channel. Exact-ID listing verifies absence. If the CLI reports an error after daemon-side mutation, an independent refresh context reruns exact-ID verification before the broad awareness refresh; a proven absence becomes a verified outcome while retaining the CLI warning, and an unavailable/present result remains a structured follow-up state.
+
+`DockerNetworkRemovalOutcome` independently records command attempted/completed, exact absence, awareness refresh, history persistence, unavailable reclaimed bytes, and failure text. The result is returned even when post-command verification or local history persistence fails, so known mutation state is not lost behind a rejected bridge call. Verified outcomes are written as provider `docker.network` with measurement kind `unavailable`. Vue offers **Review exact removal** only for complete, canonically labeled, unattached network observations, then displays the retained boundary and requires explicit confirmation; outcome status sits outside daemon-available rendering so reconciliation remains visible after daemon loss.
+
+Deterministic fake-runner tests cover incomplete and mismatched inspect identity sets, absent attachment metadata, action-time attachment changes, confirmation/plan retention, exact command arguments, post-command absence checks, available/unavailable-daemon reconciliation after mutate-then-error, history failure, and prohibition of force/prune. Full Compose verification passed 14 service methods, 7 enums, 27 models, Vue type-check/build, formatting, vet, all internal tests, and Windows cross-build. No existing Docker network was used or removed.
+
+M3.6 is the next ready phase and may only enumerate WSL distributions and discover backing VHDX metadata. Shutdown, elevation, mount, optimize, compact, logical-cleanup, and physical-reclaim execution remain unauthorized.
 
 ## Required core models
 

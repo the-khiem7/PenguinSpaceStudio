@@ -3,8 +3,8 @@ baseline_schema: "2.0"
 pack: "penguin-space"
 document: "roadmap"
 status: "active"
-updated: "2026-08-13"
-code_ref: "HEAD (M3.4 Docker cleanup-semantics decision)"
+updated: "2026-08-14"
+code_ref: "HEAD (M3.5 exact Compose network removal)"
 ---
 
 # Product roadmap and verification state
@@ -18,7 +18,7 @@ code_ref: "HEAD (M3.4 Docker cleanup-semantics decision)"
 | Architecture and usage contract | Complete | Source-code and use-guide documents created because the proposal defines both materially |
 | Root proposal deletion | Complete | Root source removed after SHA-256 equality and pack-coverage verification |
 | Phase 0 — Research and decision closure | Complete with scoped deferrals | Nine decisions were resolved or explicitly deferred in the Phase 0 register; Docker-only toolchain spike passed without a host SDK |
-| Product implementation | M1 complete with two scoped environment deferrals; M2 complete; M3.3 read-only Docker ownership presentation accepted on Windows | Eleven developer-tool lifecycles and discovery-first UI are complete. Docker reports five daemon-wide resource classes plus exact Compose-label project/unscoped grouping, ID-backed relationships, and selected-builder BuildKit scope without cleanup; `v0.1.3` passed available/unavailable UAT. |
+| Product implementation | M1 complete with two scoped environment deferrals; M2 complete; M3.5 exact Compose custom-network removal implemented and Docker-verified | Eleven developer-tool lifecycles and discovery-first UI are complete. Docker reports five daemon-wide resource classes plus exact Compose-label project/unscoped grouping and ID-backed relationships. One fresh, complete, canonically labeled, unattached custom network may enter an exact-ID Review/removal/reconciliation lifecycle; every other Docker class, prune/force, and byte-reclaim claim remains blocked. |
 
 ## Phase 0 — Research and decision closure
 
@@ -102,6 +102,8 @@ Implement Docker/Docker Desktop/Rancher awareness; independent resource inspecti
 
 **M3.4 Docker cleanup-semantics decision (2026-08-13):** current Docker CLI semantics were reviewed per resource. M3.5 may implement only removal of one exact custom network at a time, because `docker network rm <ID>` is target-specific and refuses a connected network. Eligibility requires a complete fresh ownership snapshot, a valid Compose project/network label, zero attachment IDs, backend-retained exact ID, immediate re-inspection before execution, explicit Review confirmation, no force flag, and post-command verification that the ID is absent. It must report outcome only, not reclaimed bytes. Images remain blocked because removal can untag multiple references and shared-layer bytes are unresolved; stopped containers remain blocked because writable-layer/state-loss and mount semantics lack a fixture; BuildKit remains blocked because prune operates on selected-builder cache sets rather than observed record IDs; volumes remain blocked as Stateful/Danger. Blanket prune and multi-resource removal are prohibited. M3.6 is separately authorized only for read-only WSL distro/VHDX discovery—no shutdown, elevation, mount, optimize, compact, or mutation. Sources: [network rm](https://docs.docker.com/reference/cli/docker/network/rm/), [container rm](https://docs.docker.com/reference/cli/docker/container/rm/), [image rm](https://docs.docker.com/reference/cli/docker/image/rm/), [builder prune](https://docs.docker.com/reference/cli/docker/builder/prune/), and [system prune](https://docs.docker.com/reference/cli/docker/system/prune/). External documentation content is paraphrased for licensing compliance.
 
+**M3.5 implementation checkpoint (2026-08-14):** one `NetworkRemovalController` retains one exact-ID Review plan issued only from a fresh, complete ownership snapshot with one-to-one inspect identities, canonical Compose project/network labels, and non-null zero attachments. Execution consumes the retained plan after explicit confirmation, immediately revalidates identity/labels/attachments, and invokes only `docker network rm <ID>` without force. Exact-ID verification and an independent refresh reconcile normal success, verification errors, and daemon-side mutation followed by a CLI error; structured outcomes preserve attempted/completed command state, verified absence, refreshed awareness, history status, unavailable reclaimed bytes, and follow-up failures. SQLite schema v2 stores measurement kind, migrates v1 history safely, and refuses future versions. Vue exposes a separate review/confirm surface only for eligible networks and keeps outcomes visible when refresh loses the daemon. Final `docker compose run --rm verify` passed bindings (14 methods, 7 enums, 27 models), Vue type-check/build, gofmt, vet, all internal tests, and Windows production cross-build. Deterministic fake-runner tests prove fail-closed identity/attachment behavior, exact command arguments, no force/prune, post-error exact reconciliation, unavailable-daemon preservation, and history failure handling; final semantic review reported no Critical, High, or Medium issue. No existing Docker resource was removed, and no byte-reclaim or live Windows UI claim is made. M3.5 implementation is complete; M3.6 read-only WSL/VHDX discovery is next.
+
 ## Milestone 4 — Project storage
 
 **Depends on:** Milestone 1 scanner and workspace configuration.
@@ -145,7 +147,7 @@ Cover failure recovery, locked files, permission failures, malformed output, par
 
 ## Exact next action
 
-Implement M3.5 as one retained-plan lifecycle for a single eligible Compose custom network: inspect and issue an exact-ID Review plan, require explicit confirmation, re-inspect labels and zero attachments, run only `docker network rm <ID>` without force, verify absence, refresh awareness, and record an outcome with reclaimed bytes unavailable. Automated tests must use a fake runner or an explicitly isolated disposable fixture; existing user networks and all other Docker resource classes remain outside execution.
+Implement M3.6 as read-only WSL distribution and backing-VHDX discovery. Enumerate distributions and their current state without starting or stopping them; identify a backing VHDX path only from explicit, evidence-backed Windows/WSL metadata; report physical file size separately from unavailable logical usage/compactability when those values cannot be proven; surface partial access and unsupported layouts as warnings. Add no shutdown, elevation, mount, optimize, compact, sparse-mode change, logical cleanup, or physical-reclaim command. Automated tests must use fake command/metadata/filesystem boundaries or an explicitly isolated disposable fixture, and existing distributions/VHDX files remain observation-only.
 
 ## Save checkpoint — 2026-08-13
 
@@ -154,8 +156,8 @@ This checkpoint supersedes the earlier **Exact next action** acceptance instruct
 - **M2 discovery-first UI:** complete and user-confirmed. Available host providers render as full cards, pnpm without explicit `storeDir` is a configuration notice, unavailable tools are collapsed, and project provider cards remain absent until a matching approved workspace exists.
 - **Build evidence:** `d97fa27`; `docker compose run --rm verify` passed bindings (11 methods/16 models), Vue typecheck/build, gofmt, vet, internal tests, and Windows cross-build. `scripts/build-windows.ps1 -Version 0.1.1` produced `out/penguinspace-v0.1.1.exe` without overwriting prior artifacts.
 - **Boundary confirmed:** IRYS is Docker-first. Its Cargo project/build cache is not observable through the host-only Cargo provider; this is expected behavior, not an M2 detection defect.
-- **Next implementation action:** M3.3 read-only ownership presentation is implemented, Docker-verified, and accepted on Windows through `v0.1.3`. Before another M3 sub-phase begins, explicitly choose and bound either Docker cleanup-semantics evidence or read-only WSL/VHDX discovery; destructive Docker/WSL behavior remains unauthorized.
-- **Still unverified:** Docker cleanup semantics; image shared-layer reclaim; stopped-container label behavior on a live fixture; volume recovery; UAC refusal; and optional host-native visual acceptance for Cargo/Gradle/Maven/Playwright.
+- **Next implementation action:** M3.5 exact-network removal is implemented and Docker-verified. Proceed to M3.6 read-only WSL distribution and backing-VHDX discovery; destructive WSL/VHDX behavior remains unauthorized.
+- **Still unverified:** live disposable-network Windows UI execution; image shared-layer reclaim; stopped-container label behavior on a live fixture; volume recovery; UAC refusal; WSL/VHDX discovery layouts and physical-size access; and optional host-native visual acceptance for Cargo/Gradle/Maven/Playwright.
 
 ## Pack migration verification
 

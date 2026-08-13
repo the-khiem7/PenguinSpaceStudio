@@ -239,6 +239,34 @@ type DockerAwareness struct {
 	Warnings          []string                `json:"warnings"`
 }
 
+const DockerNetworkRemovalProviderID = "docker.network"
+
+type DockerNetworkRemovalPlan struct {
+	ID           string    `json:"id"`
+	NetworkID    string    `json:"networkId"`
+	NetworkName  string    `json:"networkName"`
+	Project      string    `json:"project"`
+	NetworkLabel string    `json:"networkLabel"`
+	Risk         RiskLevel `json:"risk"`
+	Consequence  string    `json:"consequence"`
+	CreatedAt    time.Time `json:"createdAt"`
+}
+
+type DockerNetworkRemovalOutcome struct {
+	PlanID                  string          `json:"planId"`
+	NetworkID               string          `json:"networkId"`
+	NetworkName             string          `json:"networkName"`
+	RemovalCommandAttempted bool            `json:"removalCommandAttempted"`
+	RemovalCommandCompleted bool            `json:"removalCommandCompleted"`
+	VerifiedAbsent          bool            `json:"verifiedAbsent"`
+	AwarenessRefreshed      bool            `json:"awarenessRefreshed"`
+	HistoryRecorded         bool            `json:"historyRecorded"`
+	ReclaimedActual         Measurement     `json:"reclaimedActual"`
+	Message                 string          `json:"message"`
+	Failure                 string          `json:"failure,omitempty"`
+	Awareness               DockerAwareness `json:"awareness"`
+}
+
 type Dashboard struct {
 	ApplicationName string `json:"applicationName"`
 	Stage           string `json:"stage"`
@@ -246,11 +274,12 @@ type Dashboard struct {
 }
 
 type HistoryRecord struct {
-	ID             string    `json:"id"`
-	ProviderID     string    `json:"providerId"`
-	PlanID         string    `json:"planId"`
-	ReclaimedBytes uint64    `json:"reclaimedBytes"`
-	CreatedAt      time.Time `json:"createdAt"`
+	ID             string          `json:"id"`
+	ProviderID     string          `json:"providerId"`
+	PlanID         string          `json:"planId"`
+	ReclaimedBytes uint64          `json:"reclaimedBytes"`
+	ReclaimedKind  MeasurementKind `json:"reclaimedKind"`
+	CreatedAt      time.Time       `json:"createdAt"`
 }
 
 type HistoryRecorder interface {

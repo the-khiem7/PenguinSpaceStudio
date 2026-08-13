@@ -132,3 +132,19 @@ button:disabled { opacity: .55; cursor: wait; }
 @media (max-width: 1100px) { .docker-subsection-heading { align-items: flex-start; flex-direction: column; gap: 10px; } .builder-metrics { grid-template-columns: repeat(2, 1fr); } }
 
 .ownership-incomplete { margin: 0; border: 1px solid #805b32; border-radius: 9px; color: #ffd2a8; background: #30251c; padding: 13px 15px; line-height: 1.45; }
+
+.network-review-button { width: fit-content; margin-top: 5px; padding: 8px 10px; font-size: .78rem; }
+.network-removal-review { border-color: #6c5f39; background: #29261d; }
+.review-tag { border-radius: 999px; padding: 4px 9px; color: #ffe0a3; background: #554522; font-size: .7rem; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; }
+.network-removal-review dl { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; margin: 18px 0; }
+.network-removal-review dl > div { min-width: 0; display: grid; gap: 6px; padding: 13px; border: 1px solid #51492f; border-radius: 8px; background: #201f1a; }
+.network-removal-review dt { color: #b9ad8c; font-size: .76rem; }
+.network-removal-review dd { margin: 0; color: #f4f7fb; overflow-wrap: anywhere; }
+.network-removal-review code { color: #ffe0a3; }
+.network-removal-review > p { color: #d2c8ac; line-height: 1.5; }
+.network-removal-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 18px; }
+.network-removal-outcome { margin: 0; border: 1px solid #31515b; border-radius: 9px; color: #9fe3d5; background: #182b31; padding: 13px 15px; line-height: 1.45; display: grid; gap: 6px; }
+.network-removal-outcome p { margin: 0; }
+.network-removal-outcome small { color: #b5c3d5; overflow-wrap: anywhere; }
+.network-removal-outcome.failed { border-color: #805b32; color: #ffd2a8; background: #30251c; }
+@media (max-width: 1100px) { .network-removal-review dl { grid-template-columns: repeat(2, 1fr); } }

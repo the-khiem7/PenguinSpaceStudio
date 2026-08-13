@@ -51,7 +51,7 @@ func TestFixtureScenarioPreservesLifecycleAndExactBytes(t *testing.T) {
 	if scenario.Verification.MeasuredAfter.Bytes != 0 {
 		t.Fatalf("bytes after = %d, want 0", scenario.Verification.MeasuredAfter.Bytes)
 	}
-	if len(history.records) != 1 || history.records[0].ReclaimedBytes != fixtureBytes {
+	if len(history.records) != 1 || history.records[0].ReclaimedBytes != fixtureBytes || history.records[0].ReclaimedKind != MeasurementMeasuredLogical {
 		t.Fatalf("history record not persisted: %#v", history.records)
 	}
 }

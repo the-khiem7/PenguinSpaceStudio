@@ -3,8 +3,8 @@ baseline_schema: "2.0"
 pack: "penguin-space"
 document: "useguide"
 status: "draft"
-updated: "2026-08-13"
-code_ref: "HEAD (M3.4 Docker cleanup-semantics decision)"
+updated: "2026-08-14"
+code_ref: "HEAD (M3.5 exact Compose network removal)"
 ---
 
 # Intended product interaction contract
@@ -45,7 +45,15 @@ Each resource row displays a backend-observed ID and current relationships: imag
 
 Windows UAT on `out/penguinspace-v0.1.3.exe` confirms both M3.3 states. With Docker 29.5.3 available, screenshots showed separate five-category daemon totals; Compose projects `docker` with 8 resources and `penguinspacestudio` with 6; one explicit unscoped Rancher image; ID-backed zero relationship counts; all ten volumes as **Stateful · Danger**; and selected-builder metrics of 40 records, 22 shared, 5 mutable, and 40 reported reclaimable with no project attribution or cleanup controls. After Rancher Desktop stopped, **Refresh Docker** displayed daemon unavailable and removed all totals, project/unscoped, and BuildKit cards without stale observations. No stopped-container fixture was created or removed for this acceptance.
 
-M3.4 authorizes only a future **Review empty network removal** action on an exact Compose custom network. The action must be one network at a time, show project/network identity and the consequence that Compose may recreate it, require explicit confirmation, and disappear or fail safely if any attachment or label changes. It never offers image, container, BuildKit, volume, or blanket-prune cleanup. M3.6 WSL information remains observation-only.
+## M3.5 exact Compose network removal
+
+An eligible custom network row shows **Review exact removal** only when the latest ownership snapshot is complete, its Compose project and network labels are canonical, attachment metadata is available, and the attachment count is zero. Selecting review triggers a new backend inspection rather than authorizing the displayed snapshot. The review panel shows the Compose project, logical network label, compact retained ID, **Review** risk, and **Reclaimed bytes: Unavailable**. It states that Compose may recreate the network and that confirmation can run only `docker network rm <retained-ID>` without force.
+
+**Cancel** closes the confirmation surface without running removal. **Confirm exact network removal** consumes the backend-retained plan; the backend immediately rechecks exact identity, labels, and non-null zero attachments. A changed, attached, missing, malformed, or partially inspected network fails without a removal command. After an attempted command, PenguinSpace reconciles the exact ID and refreshes the full Docker awareness view. The result independently reports whether the command was attempted/completed, whether absence was verified, whether awareness refreshed, and whether history was recorded. This result remains visible when the refreshed daemon is unavailable or local history persistence fails.
+
+Only a verified exact-ID absence is a successful network removal. No byte reclaim is displayed because Docker network removal has no meaningful storage-byte claim. A CLI error may still be reconciled as verified if the independent exact-ID check proves the network absent; the warning remains visible. Images, containers, BuildKit, volumes, multi-selection, force, system/builder prune, and frontend-supplied Docker arguments have no removal controls. No existing Docker resource was removed during automated verification; the phase uses deterministic fake-runner fixtures.
+
+M3.6 WSL distribution and VHDX information remains observation-only.
 
 ## Scan-to-clean flow
 

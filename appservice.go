@@ -36,6 +36,8 @@ type AppService struct {
 	history         *history.Store
 	elevation       *elevation.Controller
 	dockerInspector *dockerinventory.Inspector
+	dockerMu        sync.Mutex
+	dockerRemoval   *dockerinventory.NetworkRemovalController
 	providerMu      sync.Mutex
 	providers       map[string]core.Provider
 	providerOrder   []string
@@ -97,8 +99,8 @@ func (s *AppService) Close() error {
 func (s *AppService) Dashboard() core.Dashboard {
 	return core.Dashboard{
 		ApplicationName: "PenguinSpace",
-		Stage:           "M3.1 read-only Docker awareness; cleanup remains disabled",
-		SafetyMessage:   "Docker resources are observed independently; no prune or volume mutation is available.",
+		Stage:           "M3.5 exact Compose network removal",
+		SafetyMessage:   "Only one reviewed, unattached Compose network can be removed by exact ID; prune and force remain unavailable.",
 	}
 }
 
@@ -111,6 +113,9 @@ func (s *AppService) RecentHistory() ([]core.HistoryRecord, error) {
 }
 
 func (s *AppService) InspectDockerAwareness() core.DockerAwareness {
+	s.dockerMu.Lock()
+	defer s.dockerMu.Unlock()
+
 	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
 	defer cancel()
 	return s.dockerInspector.Inspect(ctx)
@@ -245,6 +250,7 @@ func (s *AppService) ExecuteDeveloperProvider(providerID string, confirmed bool)
 		ProviderID:     issued.plan.ProviderID,
 		PlanID:         issued.plan.ID,
 		ReclaimedBytes: verification.ReclaimedActual.Bytes,
+		ReclaimedKind:  verification.ReclaimedActual.Kind,
 		CreatedAt:      time.Now().UTC(),
 	}); err != nil {
 		return core.ProviderCleanupOutcome{}, err

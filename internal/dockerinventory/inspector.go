@@ -74,7 +74,7 @@ func (i *Inspector) Inspect(ctx context.Context) core.DockerAwareness {
 	report.Daemon.Version = server.Version
 	report.Daemon.OperatingSystem = server.OS
 	report.Daemon.Architecture = server.Arch
-	report.Daemon.Message = "Docker daemon is available. Resource inspection is read-only."
+	report.Daemon.Message = "Docker daemon is available. Resource inspection is read-only; eligible Compose network removal requires a separate reviewed plan."
 
 	diskUsage := i.inspectDiskUsage(ctx, executable, &report)
 	buildCache, builder := i.inspectBuildCache(ctx, executable, diskUsage["Build Cache"], &report)
@@ -184,7 +184,7 @@ func (i *Inspector) inspectBuildCache(ctx context.Context, executable string, us
 }
 
 func (i *Inspector) inspectNetworks(ctx context.Context, executable string, report *core.DockerAwareness) core.DockerResourceSummary {
-	result := resource("networks", "Custom networks", diskUsageRow{}, "Custom networks are grouped by exact Compose labels. Attachment counts are point-in-time observations, not removal authorization.")
+	result := resource("networks", "Custom networks", diskUsageRow{}, "Custom networks are grouped by exact Compose labels. Only one complete-snapshot, canonically labeled, unattached network can proceed to a separate exact-ID Review plan.")
 	output, err := i.runner.Run(ctx, executable, "network", "ls", "--filter", "type=custom", "--format", "json")
 	if err != nil {
 		return failedCount(result, report, "custom networks", err)
@@ -233,7 +233,7 @@ type networkInspect struct {
 	ID         string `json:"Id"`
 	Name       string
 	Labels     map[string]string
-	Containers map[string]json.RawMessage
+	Containers *map[string]json.RawMessage
 }
 
 type volumeInspect struct {
@@ -242,15 +242,15 @@ type volumeInspect struct {
 }
 
 func (i *Inspector) inspectOwnership(ctx context.Context, executable string, report *core.DockerAwareness) ([]core.DockerOwnershipGroup, bool) {
-	imageIDs, imagesListed := i.listIdentifiers(ctx, executable, report, "images for ownership", "ID", "image", "ls", "--all", "--format", "json")
-	containerIDs, containersListed := i.listIdentifiers(ctx, executable, report, "containers for relationships", "ID", "container", "ls", "--all", "--format", "json")
-	networkIDs, networksListed := i.listIdentifiers(ctx, executable, report, "custom networks for ownership", "ID", "network", "ls", "--filter", "type=custom", "--format", "json")
+	imageIDs, imagesListed := i.listIdentifiers(ctx, executable, report, "images for ownership", "ID", "image", "ls", "--all", "--no-trunc", "--format", "json")
+	containerIDs, containersListed := i.listIdentifiers(ctx, executable, report, "containers for relationships", "ID", "container", "ls", "--all", "--no-trunc", "--format", "json")
+	networkIDs, networksListed := i.listIdentifiers(ctx, executable, report, "custom networks for ownership", "ID", "network", "ls", "--no-trunc", "--filter", "type=custom", "--format", "json")
 	volumeNames, volumesListed := i.listIdentifiers(ctx, executable, report, "volumes for ownership", "Name", "volume", "ls", "--format", "json")
 
-	imageRows, imagesInspected := i.inspectRows(ctx, executable, report, "images for ownership", []string{"image", "inspect"}, imageIDs)
-	containerRows, containersInspected := i.inspectRows(ctx, executable, report, "containers for relationships", []string{"container", "inspect"}, containerIDs)
-	networkRows, networksInspected := i.inspectRows(ctx, executable, report, "custom networks for ownership", []string{"network", "inspect"}, networkIDs)
-	volumeRows, volumesInspected := i.inspectRows(ctx, executable, report, "volumes for ownership", []string{"volume", "inspect"}, volumeNames)
+	imageRows, imagesInspected := i.inspectRows(ctx, executable, report, "images for ownership", []string{"image", "inspect"}, imageIDs, "Id")
+	containerRows, containersInspected := i.inspectRows(ctx, executable, report, "containers for relationships", []string{"container", "inspect"}, containerIDs, "Id")
+	networkRows, networksInspected := i.inspectRows(ctx, executable, report, "custom networks for ownership", []string{"network", "inspect"}, networkIDs, "Id")
+	volumeRows, volumesInspected := i.inspectRows(ctx, executable, report, "volumes for ownership", []string{"volume", "inspect"}, volumeNames, "Name")
 	containerRelationshipsAvailable := containersListed && containersInspected
 	ownershipComplete := imagesListed && imagesInspected && containersListed && containersInspected && networksListed && networksInspected && volumesListed && volumesInspected
 
@@ -308,8 +308,16 @@ func (i *Inspector) inspectOwnership(ctx context.Context, executable string, rep
 			report.Warnings = append(report.Warnings, "Docker returned a malformed network inspect row; that network was not grouped.")
 			continue
 		}
+		attachmentsAvailable := value.Containers != nil
+		var attachmentCount uint64
+		if attachmentsAvailable {
+			attachmentCount = uint64(len(*value.Containers))
+		} else {
+			ownershipComplete = false
+			report.Warnings = append(report.Warnings, "Docker omitted network attachment metadata; the relationship is unavailable and ownership is incomplete.")
+		}
 		observations = append(observations, scopedResource(value.ID, "network", value.Name, value.Labels, false, core.RiskReview,
-			relationship("container-attachments", uint64(len(value.Containers)), true), ""))
+			relationship("container-attachments", attachmentCount, attachmentsAvailable), ""))
 	}
 	for _, row := range volumeRows {
 		var value volumeInspect
@@ -351,8 +359,13 @@ func (i *Inspector) listIdentifiers(ctx context.Context, executable string, repo
 	return values, true
 }
 
-func (i *Inspector) inspectRows(ctx context.Context, executable string, report *core.DockerAwareness, label string, command []string, identifiers []string) ([]json.RawMessage, bool) {
+func (i *Inspector) inspectRows(ctx context.Context, executable string, report *core.DockerAwareness, label string, command []string, identifiers []string, identityField string) ([]json.RawMessage, bool) {
 	rows := make([]json.RawMessage, 0, len(identifiers))
+	expected := make(map[string]struct{}, len(identifiers))
+	for _, identifier := range identifiers {
+		expected[identifier] = struct{}{}
+	}
+	seen := make(map[string]struct{}, len(identifiers))
 	complete := true
 	for start := 0; start < len(identifiers); start += inspectBatchSize {
 		end := min(start+inspectBatchSize, len(identifiers))
@@ -365,13 +378,35 @@ func (i *Inspector) inspectRows(ctx context.Context, executable string, report *
 			continue
 		}
 		for _, line := range nonEmptyLines(output) {
-			if !json.Valid([]byte(line)) {
+			var value map[string]json.RawMessage
+			if err := json.Unmarshal([]byte(line), &value); err != nil {
 				report.Warnings = append(report.Warnings, fmt.Sprintf("Docker returned malformed inspect data for %s.", label))
 				complete = false
 				continue
 			}
+			var identity string
+			if err := json.Unmarshal(value[identityField], &identity); err != nil || identity == "" {
+				report.Warnings = append(report.Warnings, fmt.Sprintf("Docker returned inspect data without an identity for %s.", label))
+				complete = false
+				continue
+			}
+			if _, requested := expected[identity]; !requested {
+				report.Warnings = append(report.Warnings, fmt.Sprintf("Docker returned an unexpected inspect identity for %s.", label))
+				complete = false
+				continue
+			}
+			if _, duplicate := seen[identity]; duplicate {
+				report.Warnings = append(report.Warnings, fmt.Sprintf("Docker returned a duplicate inspect identity for %s.", label))
+				complete = false
+				continue
+			}
+			seen[identity] = struct{}{}
 			rows = append(rows, json.RawMessage(line))
 		}
+	}
+	if len(seen) != len(expected) {
+		report.Warnings = append(report.Warnings, fmt.Sprintf("Docker did not return one inspect row for every requested identity in %s.", label))
+		complete = false
 	}
 	return rows, complete
 }

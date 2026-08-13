@@ -10,3 +10,4 @@ frontend/*.tsbuildinfo
 .env
 .idea/
 .vscode/
+semantic-review

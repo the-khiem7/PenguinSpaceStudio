@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref } from "vue";
-import { backend, ElevationProbeMode, type DockerAwareness, type ElevationStatus, type ProviderAvailability, type Scenario } from "./backend";
+import { backend, ElevationProbeMode, type DockerAwareness, type DockerNetworkRemovalOutcome, type DockerNetworkRemovalPlan, type DockerScopedResource, type ElevationStatus, type ProviderAvailability, type Scenario } from "./backend";
 import ProviderCard from "./components/ProviderCard.vue";
 
 type ProviderDefinition = {
@@ -42,6 +42,10 @@ const discoveryError = ref("");
 const dockerAwareness = ref<DockerAwareness | null>(null);
 const dockerLoading = ref(false);
 const dockerError = ref("");
+const dockerNetworkPlan = ref<DockerNetworkRemovalPlan | null>(null);
+const dockerNetworkOutcome = ref<DockerNetworkRemovalOutcome | null>(null);
+const dockerNetworkReviewingID = ref("");
+const dockerNetworkRemoving = ref(false);
 let elevationPoller: ReturnType<typeof setInterval> | undefined;
 
 const reclaimed = computed(() => scenario.value?.verification.reclaimedActual.bytes ?? 0);
@@ -106,12 +110,54 @@ async function refreshDockerAwareness() {
   dockerLoading.value = true;
   dockerError.value = "";
   dockerAwareness.value = null;
+  dockerNetworkPlan.value = null;
+  dockerNetworkOutcome.value = null;
   try {
     dockerAwareness.value = await backend.inspectDockerAwareness();
   } catch (cause) {
     dockerError.value = `Docker awareness failed: ${String(cause)}`;
   } finally {
     dockerLoading.value = false;
+  }
+}
+
+function canReviewDockerNetwork(resource: DockerScopedResource) {
+  const attachments = resource.relationships.filter((relationship) => relationship.kind === "container-attachments");
+  return dockerAwareness.value?.ownershipComplete === true &&
+    resource.kind === "network" &&
+    resource.scope === "compose-project" &&
+    Boolean(resource.labels.project && resource.labels.network) &&
+    attachments.length === 1 && attachments[0].available && attachments[0].count === 0;
+}
+
+async function reviewDockerNetwork(networkId: string) {
+  dockerNetworkReviewingID.value = networkId;
+  dockerNetworkPlan.value = null;
+  dockerNetworkOutcome.value = null;
+  dockerError.value = "";
+  try {
+    dockerNetworkPlan.value = await backend.inspectDockerNetworkRemoval(networkId);
+  } catch (cause) {
+    dockerError.value = `Docker network review failed: ${String(cause)}`;
+  } finally {
+    dockerNetworkReviewingID.value = "";
+  }
+}
+
+async function executeDockerNetworkRemoval() {
+  if (!dockerNetworkPlan.value) return;
+  dockerNetworkRemoving.value = true;
+  dockerError.value = "";
+  try {
+    const outcome = await backend.executeDockerNetworkRemoval(dockerNetworkPlan.value.id);
+    dockerNetworkOutcome.value = outcome;
+    dockerAwareness.value = outcome.awareness;
+    dockerNetworkPlan.value = null;
+  } catch (cause) {
+    dockerError.value = `Docker network removal failed: ${String(cause)}`;
+    dockerNetworkPlan.value = null;
+  } finally {
+    dockerNetworkRemoving.value = false;
   }
 }
 
@@ -283,11 +329,11 @@ function availabilityMessage(providerID: string) {
       <section id="containers" class="provider-category docker-awareness" aria-labelledby="docker-awareness-title">
         <div class="provider-category-heading">
           <div>
-            <p class="eyebrow">M3.3 · Read-only ownership</p>
-            <h2 id="docker-awareness-title">Docker resource ownership view</h2>
-            <p class="muted">Daemon totals stay separate from exact Compose-label grouping. Relationships are point-in-time observations; no cleanup command is exposed.</p>
+            <p class="eyebrow">M3.5 · Exact network lifecycle</p>
+            <h2 id="docker-awareness-title">Docker resource ownership and network review</h2>
+            <p class="muted">Daemon totals stay separate from exact Compose-label grouping. Only one canonically labeled, unattached custom network can proceed to an exact-ID Review plan; prune, force, and every other resource class remain unavailable.</p>
           </div>
-          <button class="secondary" :disabled="dockerLoading" @click="refreshDockerAwareness">{{ dockerLoading ? "Inspecting…" : "Refresh Docker" }}</button>
+          <button class="secondary" :disabled="dockerLoading || dockerNetworkRemoving || Boolean(dockerNetworkReviewingID)" @click="refreshDockerAwareness">{{ dockerLoading ? "Inspecting…" : "Refresh Docker" }}</button>
         </div>
         <p v-if="dockerError" class="error" role="alert">{{ dockerError }}</p>
         <p v-else-if="dockerLoading && !dockerAwareness" class="muted provider-loading">Checking Docker daemon, ownership labels, and relationships…</p>
@@ -299,6 +345,13 @@ function availabilityMessage(providerID: string) {
               <strong v-else>Docker resources were not inspected</strong>
             </div>
             <small>{{ dockerAwareness.daemon.message }}</small>
+          </article>
+
+          <article v-if="dockerNetworkOutcome" class="network-removal-outcome" :class="{ failed: Boolean(dockerNetworkOutcome.failure) }" role="status">
+            <strong>{{ dockerNetworkOutcome.verifiedAbsent ? "Removal verified" : "Removal needs follow-up" }}</strong>
+            <p>{{ dockerNetworkOutcome.message }}</p>
+            <small v-if="dockerNetworkOutcome.failure">{{ dockerNetworkOutcome.failure }}</small>
+            <small>Command attempted: {{ dockerNetworkOutcome.removalCommandAttempted ? "yes" : "no" }} · Command completed: {{ dockerNetworkOutcome.removalCommandCompleted ? "yes" : "no" }} · Refreshed awareness: {{ dockerNetworkOutcome.awarenessRefreshed ? "yes" : "no" }} · History recorded: {{ dockerNetworkOutcome.historyRecorded ? "yes" : "no" }}</small>
           </article>
 
           <template v-if="dockerAwareness.daemon.available">
@@ -364,9 +417,37 @@ function availabilityMessage(providerID: string) {
                         </span>
                         <span v-if="resource.relatedResourceId"><b>image</b> {{ compactDockerID(resource.relatedResourceId) }}</span>
                       </div>
+                      <button
+                        v-if="canReviewDockerNetwork(resource)"
+                        class="secondary network-review-button"
+                        :disabled="dockerNetworkRemoving || Boolean(dockerNetworkReviewingID)"
+                        @click="reviewDockerNetwork(resource.id)"
+                      >{{ dockerNetworkReviewingID === resource.id ? "Re-inspecting…" : "Review exact removal" }}</button>
                     </div>
                   </div>
                 </article>
+              </div>
+            </section>
+
+            <section v-if="dockerNetworkPlan" class="panel network-removal-review" aria-labelledby="network-removal-review-title">
+              <div class="docker-subsection-heading">
+                <div>
+                  <p class="eyebrow">Review · exact ID only</p>
+                  <h3 id="network-removal-review-title">Remove {{ dockerNetworkPlan.networkName }}?</h3>
+                </div>
+                <span class="review-tag">{{ dockerNetworkPlan.risk }}</span>
+              </div>
+              <dl>
+                <div><dt>Compose project</dt><dd>{{ dockerNetworkPlan.project }}</dd></div>
+                <div><dt>Network label</dt><dd>{{ dockerNetworkPlan.networkLabel }}</dd></div>
+                <div><dt>Retained network ID</dt><dd><code :title="dockerNetworkPlan.networkId">{{ compactDockerID(dockerNetworkPlan.networkId) }}</code></dd></div>
+                <div><dt>Reclaimed bytes</dt><dd>Unavailable</dd></div>
+              </dl>
+              <p>{{ dockerNetworkPlan.consequence }}</p>
+              <p class="muted">Confirmation triggers one immediate label and attachment re-inspection, then only <code>docker network rm &lt;retained-ID&gt;</code>. No force flag is available.</p>
+              <div class="network-removal-actions">
+                <button class="secondary" :disabled="dockerNetworkRemoving" @click="dockerNetworkPlan = null">Cancel</button>
+                <button :disabled="dockerNetworkRemoving" @click="executeDockerNetworkRemoval">{{ dockerNetworkRemoving ? "Removing and verifying…" : "Confirm exact network removal" }}</button>
               </div>
             </section>
 

@@ -136,6 +136,32 @@ export type DockerAwareness = {
   warnings: string[] | null;
 };
 
+export type DockerNetworkRemovalPlan = {
+  id: string;
+  networkId: string;
+  networkName: string;
+  project: string;
+  networkLabel: string;
+  risk: "Review";
+  consequence: string;
+  createdAt: string;
+};
+
+export type DockerNetworkRemovalOutcome = {
+  planId: string;
+  networkId: string;
+  networkName: string;
+  removalCommandAttempted: boolean;
+  removalCommandCompleted: boolean;
+  verifiedAbsent: boolean;
+  awarenessRefreshed: boolean;
+  historyRecorded: boolean;
+  reclaimedActual: { bytes: number; kind: string };
+  message: string;
+  failure?: string;
+  awareness: DockerAwareness;
+};
+
 export const backend = {
   dashboard: () => AppService.Dashboard(),
   runFixtureScenario: (): Promise<Scenario> => AppService.RunFixtureScenario() as Promise<Scenario>,
@@ -144,6 +170,8 @@ export const backend = {
   elevationStatus: (): Promise<ElevationStatus> => AppService.ElevationStatus() as Promise<ElevationStatus>,
   recentHistory: () => AppService.RecentHistory(),
   inspectDockerAwareness: (): Promise<DockerAwareness> => AppService.InspectDockerAwareness() as Promise<DockerAwareness>,
+  inspectDockerNetworkRemoval: (networkId: string): Promise<DockerNetworkRemovalPlan> => AppService.InspectDockerNetworkRemoval(networkId) as Promise<DockerNetworkRemovalPlan>,
+  executeDockerNetworkRemoval: (planId: string): Promise<DockerNetworkRemovalOutcome> => AppService.ExecuteDockerNetworkRemoval(planId, true) as Promise<DockerNetworkRemovalOutcome>,
   setWorkspaceRoot: (path: string): Promise<WorkspaceRoot> => AppService.SetWorkspaceRoot(path) as Promise<WorkspaceRoot>,
   discoverDeveloperProviders: (): Promise<ProviderAvailability[]> => AppService.DiscoverDeveloperProviders() as Promise<ProviderAvailability[]>,
   inspectDeveloperProvider: (providerId: string): Promise<ProviderInspection> => AppService.InspectDeveloperProvider(providerId) as Promise<ProviderInspection>,

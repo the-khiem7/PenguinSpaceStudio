@@ -42,6 +42,7 @@ func (o *Orchestrator) RunFixtureScenario(ctx context.Context) (Scenario, error)
 		ProviderID:     scan.ProviderID,
 		PlanID:         plan.ID,
 		ReclaimedBytes: verification.ReclaimedActual.Bytes,
+		ReclaimedKind:  verification.ReclaimedActual.Kind,
 		CreatedAt:      time.Now().UTC(),
 	}); err != nil {
 		return Scenario{}, err
