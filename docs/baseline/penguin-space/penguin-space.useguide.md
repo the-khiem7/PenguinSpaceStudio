@@ -4,7 +4,7 @@ pack: "penguin-space"
 document: "useguide"
 status: "draft"
 updated: "2026-08-13"
-code_ref: "31bd100 (M3.1 accepted on Windows via v0.1.2)"
+code_ref: "114a64b (M3.1 accepted on Windows via v0.1.2; M3.2 evidence only)"
 ---
 
 # Intended product interaction contract
@@ -33,7 +33,7 @@ At launch and on **Refresh Docker**, PenguinSpace performs a bounded read-only d
 
 Volumes are marked **Stateful** because they may contain persistent data. No M3.1 card has a review, clean, prune, or delete control. If the Docker CLI is missing or the daemon cannot be reached, the surface reports that state without showing stale resource claims. Partial category failures appear as warnings and unavailable values. A future cleanup workflow must not reuse this observation surface as authorization.
 
-Windows acceptance on `out/penguinspace-v0.1.2.exe` confirms both states. With Docker 29.5.3 available, the surface displayed exactly five resource categories and Stateful volumes without cleanup controls. After the operator stopped Rancher Desktop, **Refresh Docker** displayed **Daemon unavailable / Docker resources were not inspected** and removed the previous cards. Rancher remains stopped; request that the operator restart it before the next Docker runtime check.
+Windows acceptance on `out/penguinspace-v0.1.2.exe` confirms both states. With Docker 29.5.3 available, the surface displayed exactly five resource categories and Stateful volumes without cleanup controls. After the operator stopped Rancher Desktop, **Refresh Docker** displayed **Daemon unavailable / Docker resources were not inspected** and removed the previous cards. Rancher was later restarted for M3.2 read-only ownership evidence.
 
 ## Scan-to-clean flow
 

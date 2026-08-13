@@ -4,7 +4,7 @@ pack: "penguin-space"
 document: "roadmap"
 status: "active"
 updated: "2026-08-13"
-code_ref: "31bd100 (M3.1 accepted on Windows via v0.1.2)"
+code_ref: "114a64b + M3.2 runtime evidence (no code change)"
 ---
 
 # Product roadmap and verification state
@@ -94,7 +94,9 @@ Implement Docker/Docker Desktop/Rancher awareness; independent resource inspecti
 
 **Verification gate:** real Docker and WSL/VHDX scenarios, including daemon unavailable, a running distro, elevation refusal, and interrupted compaction.
 
-**M3.1 implementation and acceptance checkpoint (2026-08-13):** `internal/dockerinventory` performs a fixed, bounded, read-only Docker CLI sequence. It detects the server through `docker version`, reads daemon-wide logical size/reclaimable summaries, and independently counts unique images, stopped containers, BuildKit records, custom networks, and volumes. `AppService.InspectDockerAwareness` exposes only observation models under a 20-second context; Vue renders five resource categories, unavailable measurements, partial-inspection warnings, and a distinct Stateful volume treatment. There is no cleanup plan, executor, user-provided Docker argument, prune command, or volume mutation path. Full `docker compose run --rm verify` passed generated bindings (12 methods/19 models), Vue type-check/build, gofmt, vet, all internal tests, and Windows cross-build. `out/penguinspace-v0.1.2.exe` was built at 13,789,696 bytes with SHA-256 `ffbe4ded8f938d9cf9ca09f3cbba883487c30a3a7712f30a75410392a53923ce`. User-supplied Windows screenshots verify Docker 29.5.3 (`linux/amd64`) with exactly five categories, volumes marked Stateful, and no cleanup control. After Rancher Desktop was stopped, refresh reported daemon unavailable, removed all resource cards, and retained no stale observations. M3.1 acceptance is complete; Rancher remains stopped by operator choice.
+**M3.1 implementation and acceptance checkpoint (2026-08-13):** `internal/dockerinventory` performs a fixed, bounded, read-only Docker CLI sequence. It detects the server through `docker version`, reads daemon-wide logical size/reclaimable summaries, and independently counts unique images, stopped containers, BuildKit records, custom networks, and volumes. `AppService.InspectDockerAwareness` exposes only observation models under a 20-second context; Vue renders five resource categories, unavailable measurements, partial-inspection warnings, and a distinct Stateful volume treatment. There is no cleanup plan, executor, user-provided Docker argument, prune command, or volume mutation path. Full `docker compose run --rm verify` passed generated bindings (12 methods/19 models), Vue type-check/build, gofmt, vet, all internal tests, and Windows cross-build. `out/penguinspace-v0.1.2.exe` was built at 13,789,696 bytes with SHA-256 `ffbe4ded8f938d9cf9ca09f3cbba883487c30a3a7712f30a75410392a53923ce`. User-supplied Windows screenshots verify Docker 29.5.3 (`linux/amd64`) with exactly five categories, volumes marked Stateful, and no cleanup control. After Rancher Desktop was stopped, refresh reported daemon unavailable, removed all resource cards, and retained no stale observations. M3.1 acceptance is complete.
+
+**M3.2 ownership/scoping evidence checkpoint (2026-08-13):** Rancher Desktop was restarted by the operator and read-only inspection ran against Docker Engine 29.5.3 and the default BuildKit v0.30.0 builder. Of three images, the PenguinSpace and IRYS toolchain images carried canonical Compose project/service labels; the Rancher proxy image was unscoped. Both custom networks and all ten volumes carried `com.docker.compose.project` plus their resource-specific logical-name labels. No containers existed, both custom networks had no attachments, and no volume was mounted by a container. The selected builder exposed 40 cache records, including 22 marked shared, with no canonical Compose project identity. Decision: canonical Compose labels may group images, containers, networks, and volumes for read-only presentation only; absent/malformed labels remain unscoped and names are never used as ownership fallback. Relationships must be re-read from IDs, network attachments, and volume mounts. BuildKit remains builder-scoped and unassigned to projects. Volumes remain Danger even when labeled and unmounted. No cleanup authorization follows from this evidence.
 
 ## Milestone 4 — Project storage
 
@@ -139,7 +141,7 @@ Cover failure recovery, locked files, permission failures, malformed output, par
 
 ## Exact next action
 
-Begin M3.2 as a non-destructive Docker ownership/scoping evidence phase. With Rancher Desktop explicitly restarted by the operator, capture Compose/project labels and resource relationships for disposable images, stopped containers, custom networks, and volumes; determine which observations can be safely grouped without attributing shared BuildKit cache to one workspace. Produce a decision record only—do not add cleanup, prune, or volume mutation until ownership and recovery semantics are closed.
+Implement M3.3 as read-only ownership presentation. Extend Docker observation models to expose canonical Compose project/resource labels, an explicit scoped/unscoped status, and current relationship counts for images, stopped containers, custom networks, and volumes. Keep BuildKit at selected-builder scope with no project attribution; keep volumes Stateful/Danger regardless of labels or mount count. Do not add cleanup, prune, delete, or volume mutation.
 
 ## Save checkpoint — 2026-08-13
 
@@ -148,8 +150,8 @@ This checkpoint supersedes the earlier **Exact next action** acceptance instruct
 - **M2 discovery-first UI:** complete and user-confirmed. Available host providers render as full cards, pnpm without explicit `storeDir` is a configuration notice, unavailable tools are collapsed, and project provider cards remain absent until a matching approved workspace exists.
 - **Build evidence:** `d97fa27`; `docker compose run --rm verify` passed bindings (11 methods/16 models), Vue typecheck/build, gofmt, vet, internal tests, and Windows cross-build. `scripts/build-windows.ps1 -Version 0.1.1` produced `out/penguinspace-v0.1.1.exe` without overwriting prior artifacts.
 - **Boundary confirmed:** IRYS is Docker-first. Its Cargo project/build cache is not observable through the host-only Cargo provider; this is expected behavior, not an M2 detection defect.
-- **Next implementation action:** M3.1 read-only Docker awareness is accepted on Windows through `out/penguinspace-v0.1.2.exe`. M3.2 should gather Docker ownership/scoping evidence only after the operator restarts Rancher Desktop; no cleanup planning is authorized yet.
-- **Still unverified:** Docker resource ownership and cleanup semantics; BuildKit attribution; volume recovery; UAC refusal; and optional host-native visual acceptance for Cargo/Gradle/Maven/Playwright.
+- **Next implementation action:** M3.1 is accepted and M3.2 ownership/scoping evidence is closed. M3.3 may implement read-only grouping by canonical Compose labels with explicit unscoped fallbacks and relationship counts; BuildKit remains builder-wide and volumes remain Stateful/Danger.
+- **Still unverified:** Docker cleanup semantics; image shared-layer reclaim; stopped-container label behavior on a live fixture; volume recovery; UAC refusal; and optional host-native visual acceptance for Cargo/Gradle/Maven/Playwright.
 
 ## Pack migration verification
 

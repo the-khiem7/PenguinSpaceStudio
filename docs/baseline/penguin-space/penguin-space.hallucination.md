@@ -4,7 +4,7 @@ pack: "penguin-space"
 document: "hallucination"
 status: "active"
 updated: "2026-08-13"
-code_ref: "31bd100 (M3.1 accepted on Windows via v0.1.2)"
+code_ref: "114a64b + M3.2 runtime evidence (no code change)"
 ---
 
 # Decisions, unknowns, and claim boundaries
@@ -27,10 +27,27 @@ code_ref: "31bd100 (M3.1 accepted on Windows via v0.1.2)"
 
 **Open questions and required evidence**
 
-- M3.1 daemon-available and daemon-unavailable Windows behavior is runtime-confirmed. Ownership labels and cleanup semantics remain unresolved and must not be inferred from counts or disk-usage summaries. Rancher Desktop is currently stopped and requires operator restart before further Docker evidence collection.
-- BuildKit cache may be global/shared; it must not be attributed to one workspace without evidence.
-- Docker volumes remain persistent-state candidates and require a separate Danger workflow plus real recovery/verification evidence before any cleanup is enabled.
+- M3.1 daemon-available and daemon-unavailable Windows behavior is runtime-confirmed. M3.2 permits canonical Compose labels for read-only grouping only; cleanup semantics remain unresolved and must not be inferred from labels, counts, or disk-usage summaries.
+- BuildKit is confirmed selected-builder scope with shared records and no canonical project identity; project attribution is prohibited pending new evidence.
+- Docker volumes are groupable for observability but remain persistent-state candidates requiring a separate Danger workflow plus real recovery/verification evidence before any cleanup is enabled.
+- Stopped-container grouping by canonical labels is decided but still lacks a live runtime fixture; absent labels always remain unscoped.
 - The four host workspace providers still need optional visual acceptance against a disposable host-native project; this is not evidence for Docker-held project artifacts.
+
+## M3.2 Docker ownership/scoping decision record
+
+**Scope and evidence:** read-only inspection on Docker Engine 29.5.3, default context, and the selected default BuildKit v0.30.0 builder. No container, image, network, volume, or cache mutation was performed. Official Docker documentation defines labels as object metadata and requires Compose-created resources to carry `com.docker.compose.project`; `buildx du` reports only the currently selected builder. [Docker object labels](https://docs.docker.com/engine/manage-resources/labels/), [Compose application model](https://docs.docker.com/compose/intro/compose-application-model/), [buildx disk usage](https://docs.docker.com/reference/cli/docker/buildx/du). External documentation content is paraphrased for licensing compliance.
+
+| Resource | Runtime evidence | Accepted read-only grouping | Claims that remain blocked |
+|---|---|---|---|
+| Images | 3 images; PenguinSpace and IRYS toolchain images carry Compose project/service labels; Rancher proxy has none; no containers reference them | Group by exact canonical project label; optionally display service label; unlabeled/malformed is `unscoped` | Labels do not prove exclusive ownership, unused state, unique bytes, or safe deletion; shared layers and multiple tags remain independent concerns |
+| Stopped containers | No containers existed during the evidence run | When present, group only by canonical project/service labels and re-read image, network, mount, and status relationships by immutable IDs | Runtime behavior on a stopped Compose fixture remains unverified; names and image tags are not ownership fallback |
+| Custom networks | 2 custom networks, both Compose-labeled; neither had container attachments | Group by canonical project plus logical network label; expose current attachment count | Empty now does not authorize future deletion; attachments must be revalidated immediately before any plan |
+| Volumes | 10 local volumes, all Compose-labeled; none mounted by a container | Group for observability by canonical project plus logical volume label | Persistent data remains Danger even when unmounted, labeled, or reported reclaimable; no cleanup until recovery evidence exists |
+| BuildKit cache | Selected builder has 40 records; 22 are marked shared; records expose no canonical Compose project identity | Keep one explicit selected-builder/daemon scope; show shared/mutable/reclaimable metadata only | Never attribute cache records or bytes to a workspace from descriptions, source paths, image labels, or timing |
+
+**Decision:** canonical Compose labels are sufficient metadata for read-only presentation grouping, not ownership proof or cleanup authorization. Labels are static for an object's lifetime but still metadata; no name-prefix inference is allowed. Every absent, conflicting, or malformed label produces an explicit unscoped group. Relationship counts are observations and must be revalidated from Docker IDs. BuildKit remains outside project grouping. Volumes remain Stateful/Danger without exception.
+
+**Follow-on:** M3.3 may implement only these read-only grouping and relationship fields. Docker cleanup semantics, image shared-layer reclaim, a stopped-container fixture, and volume recovery remain open.
 
 ## Closed decisions
 

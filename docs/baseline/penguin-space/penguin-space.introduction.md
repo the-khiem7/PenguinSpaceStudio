@@ -4,7 +4,7 @@ pack: "penguin-space"
 document: "introduction"
 status: "active"
 updated: "2026-08-13"
-code_ref: "31bd100 (M3.1 accepted on Windows via v0.1.2)"
+code_ref: "114a64b + M3.2 runtime evidence (no code change)"
 ---
 
 # PenguinSpace baseline
@@ -64,8 +64,10 @@ It is not a generic PC cleaner or merely a GUI for cache-clearing commands. Its 
 - `internal/dockerinventory` uses a fixed CLI allow-list to detect the Docker daemon and inspect five separate categories: images, stopped containers, BuildKit cache, custom networks, and volumes. Disk-usage summaries are daemon-wide; counts come from category-specific list commands, and no project ownership is inferred.
 - The Containers & WSL UI reports count, daemon size, and daemon-reported reclaimable size where available. Volumes are visually Stateful and remain Danger scope. No Docker cleanup button, plan, prune command, or volume mutation exists.
 - Docker verification passed bindings (12 methods/19 models), frontend type-check/build, formatting, vet, internal tests, and Windows cross-build. `v0.1.2` is 13,789,696 bytes with SHA-256 `ffbe4ded8f938d9cf9ca09f3cbba883487c30a3a7712f30a75410392a53923ce`.
-- User-supplied Windows screenshots complete M3.1 acceptance. With Docker 29.5.3 available, the UI showed exactly five categories, volumes as Stateful, and no cleanup control. After Rancher Desktop was stopped, refresh showed daemon unavailable and no stale resource cards. Rancher remains stopped and must be restarted by the operator before further Docker runtime work.
-- The next ready scope is M3.2 ownership/scoping evidence only. Cleanup semantics, BuildKit attribution, and volume recovery remain open and block destructive Docker work.
+- User-supplied Windows screenshots complete M3.1 acceptance. With Docker 29.5.3 available, the UI showed exactly five categories, volumes as Stateful, and no cleanup control. After Rancher Desktop was stopped, refresh showed daemon unavailable and no stale resource cards. The operator later restarted Rancher for M3.2 evidence collection.
+- M3.2 read-only evidence on the restarted daemon found canonical Compose project/service labels on the two toolchain images, project/resource labels on both custom networks and all ten volumes, and no labels on the Rancher proxy image. No containers existed; networks had no attachments and volumes had no mounts. The selected builder reported 40 cache records, 22 shared, without project identity.
+- Decision: exact canonical Compose labels may group images, containers, networks, and volumes for observation only; missing or malformed labels are explicitly unscoped and names are never inferred as ownership. BuildKit stays selected-builder scope. Volumes remain Stateful/Danger even when labeled and unmounted.
+- The next ready scope is M3.3 read-only ownership presentation. Docker cleanup semantics, image shared-layer reclaim, a stopped-container runtime fixture, and volume recovery remain open and block destructive Docker work.
 
 ## Storage model
 

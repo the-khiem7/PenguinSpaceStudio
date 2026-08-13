@@ -4,7 +4,7 @@ pack: "penguin-space"
 document: "sourcecode"
 status: "active"
 updated: "2026-08-13"
-code_ref: "working tree (M3.1 read-only Docker awareness)"
+code_ref: "114a64b + M3.2 runtime evidence (no code change)"
 ---
 
 # Architecture and implementation
@@ -75,6 +75,14 @@ For Bun, the current UI exposes logical measurement and the consequence that har
 `internal/dockerinventory.Inspector` owns a fixed observation sequence through the existing no-console command runner. It first resolves `docker`, checks the server with a JSON-formatted version request, then reads daemon-wide disk-usage summaries and independently lists unique images, stopped containers, BuildKit cache records, custom networks, and volumes. Every invocation has hard-coded arguments; no Docker command, filter, ID, or path crosses from Vue. Missing CLI or daemon produces a non-actionable status, while category-level failures produce warnings and unavailable fields rather than invented zero-byte claims.
 
 `AppService.InspectDockerAwareness` applies a 20-second context and returns `DockerAwareness`, `DockerDaemonStatus`, and ordered `DockerResourceSummary` models. The model separates count availability from byte measurement availability and labels volumes as stateful. Category commands provide counts; disk-usage byte summaries are daemon-wide. Stopped-container bytes remain unavailable rather than mixing their count with all-container storage, and the BuildKit boundary does not claim that active-builder record count is project ownership. The Vue Containers & WSL surface displays these observations but has no review, plan, execute, prune, or delete path. `docker system df` values are not physical Windows/VHDX reclaim evidence and are not attributed to a workspace.
+
+## M3.2 ownership/scoping boundary
+
+The accepted future grouping key is the exact `com.docker.compose.project` label. Resource-specific canonical labels (`service`, `network`, or `volume`) may refine display names. Missing, conflicting, or malformed labels produce an explicit unscoped group; repository paths, name prefixes, image tags, creation time, and BuildKit descriptions are never ownership fallback. Grouping is presentation metadata only and cannot create a cleanup plan.
+
+Relationship observations must remain ID-backed: image references from containers, container status, network attachment IDs, and volume mount references. They can change after inspection and require action-time revalidation if cleanup is ever designed. The current runtime had no containers, two unattached custom Compose networks, and ten unmounted Compose volumes; absence of a current relationship does not mean disposable.
+
+BuildKit remains a separate selected-builder scope. Its records expose mutable/shared/reclaimable metadata but no canonical project identity; M3.2 observed 40 records with 22 shared. Volumes remain Stateful/Danger regardless of project label or mount count. M3.3 may expose these fields read-only, but no executor or cleanup model is authorized.
 
 ## Required core models
 
