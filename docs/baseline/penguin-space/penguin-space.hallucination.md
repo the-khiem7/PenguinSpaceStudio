@@ -4,7 +4,7 @@ pack: "penguin-space"
 document: "hallucination"
 status: "active"
 updated: "2026-08-13"
-code_ref: "HEAD (M3.3 read-only ownership presentation phase commit)"
+code_ref: "HEAD (M3.3 Windows acceptance checkpoint)"
 ---
 
 # Decisions, unknowns, and claim boundaries
@@ -17,7 +17,7 @@ code_ref: "HEAD (M3.3 read-only ownership presentation phase commit)"
 - `out/penguinspace-v0.1.1.exe` was built with explicit version `0.1.1`, preserving `out/penguinspace-v0.1.0.exe` and `out/penguinspace.exe`.
 - The user confirmed the `v0.1.1` Windows UI behavior: only available host providers receive Inspect cards; pnpm without `storeDir` is a setup notice; unavailable tools are collapsed; and project providers are absent before selecting a workspace.
 - M3.1 source implements a fixed read-only Docker CLI sequence and a five-category UI. Docker verification passed 12 service methods and 19 models plus frontend build, gofmt, vet, tests, and Windows cross-build. `out/penguinspace-v0.1.2.exe` (13,789,696 bytes; SHA-256 `ffbe4ded8f938d9cf9ca09f3cbba883487c30a3a7712f30a75410392a53923ce`) passed user-confirmed Windows acceptance: daemon-available rendering showed exactly five categories with Stateful volumes and no cleanup control; after Rancher Desktop stopped, refresh reported daemon unavailable and removed all resource cards without stale data.
-- M3.3 implements exact Compose-label grouping with explicit `unscoped`, ID-backed relationship observations, incomplete-snapshot signaling, and selected-builder BuildKit records. Final Docker verification passed 12 service methods, 7 enums, 25 models, Vue type-check/build, formatting, vet, internal tests, and Windows cross-build. Live read-only inspection found projects `docker` and `penguinspacestudio`, one unscoped image, no containers, two unattached networks, ten unmounted volumes, and 40 BuildKit records/22 shared. This is not Windows visual acceptance.
+- M3.3 implements exact Compose-label grouping with explicit `unscoped`, ID-backed relationship observations, incomplete-snapshot signaling, and selected-builder BuildKit records. Final Docker verification passed 12 service methods, 7 enums, 25 models, Vue type-check/build, formatting, vet, internal tests, and Windows cross-build. `out/penguinspace-v0.1.3.exe` (13,830,656 bytes; SHA-256 `1eec64324e6c6eb757ee19e4ae698b922998dcaafeff4d9051fbb7d27e37d0a8`) passed user-supplied Windows UAT in both daemon states: available screenshots showed projects `docker`/`penguinspacestudio`, one unscoped image, ID-backed zero relationships, every volume Stateful/Danger, selected-builder 40 records/22 shared/5 mutable, and no cleanup controls; the unavailable screenshot showed all Docker cards removed after Refresh with no stale observations.
 
 **Decisions now in force**
 
@@ -28,7 +28,7 @@ code_ref: "HEAD (M3.3 read-only ownership presentation phase commit)"
 
 **Open questions and required evidence**
 
-- M3.1 daemon-available and daemon-unavailable Windows behavior is runtime-confirmed. M3.3 implements the M3.2 grouping decision, but its new ownership UI has not yet received Windows visual acceptance. Cleanup semantics remain unresolved and must not be inferred from labels, counts, relationships, or disk-usage summaries.
+- M3.1 and M3.3 daemon-available and daemon-unavailable Windows behavior are runtime-confirmed. M3.3 accepts only the read-only ownership presentation; cleanup semantics remain unresolved and must not be inferred from labels, counts, relationships, or disk-usage summaries.
 - BuildKit is confirmed selected-builder scope with shared records and no canonical project identity; project attribution is prohibited pending new evidence.
 - Docker volumes are groupable for observability but remain persistent-state candidates requiring a separate Danger workflow plus real recovery/verification evidence before any cleanup is enabled.
 - Stopped-container grouping by canonical labels is decided but still lacks a live runtime fixture; absent labels always remain unscoped.
@@ -48,7 +48,7 @@ code_ref: "HEAD (M3.3 read-only ownership presentation phase commit)"
 
 **Decision:** canonical Compose labels are sufficient metadata for read-only presentation grouping, not ownership proof or cleanup authorization. Labels are static for an object's lifetime but still metadata; no name-prefix inference is allowed. Every absent, conflicting, or malformed label produces an explicit unscoped group. Relationship counts are observations and must be revalidated from Docker IDs. BuildKit remains outside project grouping. Volumes remain Stateful/Danger without exception.
 
-**Follow-on:** M3.3 now implements only these read-only grouping and relationship fields, including fail-closed incomplete-snapshot handling. Windows visual acceptance, Docker cleanup semantics, image shared-layer reclaim, a stopped-container fixture, and volume recovery remain open.
+**Follow-on:** M3.3 implements and Windows-validates only these read-only grouping and relationship fields, including fail-closed incomplete-snapshot handling. Docker cleanup semantics, image shared-layer reclaim, a stopped-container fixture, volume recovery, and WSL/VHDX behavior remain open.
 
 ## Closed decisions
 

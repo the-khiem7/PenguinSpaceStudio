@@ -4,7 +4,7 @@ pack: "penguin-space"
 document: "useguide"
 status: "draft"
 updated: "2026-08-13"
-code_ref: "HEAD (M3.3 read-only ownership presentation phase commit)"
+code_ref: "HEAD (M3.3 Windows acceptance checkpoint)"
 ---
 
 # Intended product interaction contract
@@ -43,7 +43,7 @@ Each resource row displays a backend-observed ID and current relationships: imag
 
 **Selected Docker builder** is a separate selected-builder card. It summarizes BuildKit record, shared, mutable, and daemon-reported reclaimable flags but never assigns records to a Compose project. Every volume remains **Stateful · Danger** even when its mount count is zero. These labels and counts are observation only: there is no Review, Clean, Prune, Delete, or volume action.
 
-Docker verification and live daemon-data checks pass, but the M3.3 presentation has not yet received Windows visual acceptance. The next acceptance run should use a new explicit versioned artifact, verify both daemon states and stale-state clearing, and must not create or remove a Docker fixture merely to populate the stopped-container row.
+Windows UAT on `out/penguinspace-v0.1.3.exe` confirms both M3.3 states. With Docker 29.5.3 available, screenshots showed separate five-category daemon totals; Compose projects `docker` with 8 resources and `penguinspacestudio` with 6; one explicit unscoped Rancher image; ID-backed zero relationship counts; all ten volumes as **Stateful · Danger**; and selected-builder metrics of 40 records, 22 shared, 5 mutable, and 40 reported reclaimable with no project attribution or cleanup controls. After Rancher Desktop stopped, **Refresh Docker** displayed daemon unavailable and removed all totals, project/unscoped, and BuildKit cards without stale observations. No stopped-container fixture was created or removed for this acceptance.
 
 ## Scan-to-clean flow
 

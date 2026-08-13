@@ -4,7 +4,7 @@ pack: "penguin-space"
 document: "introduction"
 status: "active"
 updated: "2026-08-13"
-code_ref: "HEAD (M3.3 read-only ownership presentation phase commit)"
+code_ref: "HEAD (M3.3 Windows acceptance checkpoint)"
 ---
 
 # PenguinSpace baseline
@@ -77,7 +77,8 @@ It is not a generic PC cleaner or merely a GUI for cache-clearing commands. Its 
 - Images expose current all-container reference counts; stopped containers expose image ID plus network and mount counts; custom networks expose attachment counts; volumes expose mount counts and remain Stateful/Danger even at zero. Every relationship count has an availability flag, and a partial list/inspect result marks the ownership snapshot incomplete rather than silently converting missing data to zero or unscoped.
 - BuildKit is rendered separately as `selected-builder`, with ID-backed shared/mutable/reclaimable record metadata and no project attribution. The UI provides observation tags only; no Docker cleanup, prune, delete, review, plan, or executor was added.
 - Final `docker compose run --rm verify` passed Wails binding generation (12 methods, 7 enums, 25 models), Vue type-check/build, formatting, vet, all internal tests, and Windows production cross-build. A live read-only check against Docker Engine 29.5.3 observed projects `docker` and `penguinspacestudio`, one unscoped image, zero containers, two unattached custom networks, ten unmounted volumes, and 40 selected-builder records including 22 shared.
-- This is implementation and live-daemon data verification, not Windows visual acceptance or cleanup authorization. The stopped-container runtime fixture, Docker cleanup semantics, shared-layer reclaim, volume recovery, and any destructive flow remain open.
+- Windows UAT on `out/penguinspace-v0.1.3.exe` (13,830,656 bytes; SHA-256 `1eec64324e6c6eb757ee19e4ae698b922998dcaafeff4d9051fbb7d27e37d0a8`) completes M3.3 acceptance. With Docker 29.5.3 available, screenshots confirmed separate daemon totals, Compose projects `docker` (8 resources) and `penguinspacestudio` (6), one explicit unscoped Rancher image, ID-backed zero relationships, ten Stateful/Danger volumes, and selected-builder metrics of 40 records/22 shared/5 mutable/40 reported reclaimable with no project attribution or cleanup controls. After Rancher stopped, Refresh reported daemon unavailable and removed every totals, ownership, unscoped, and BuildKit card without stale observations.
+- This acceptance authorizes the read-only presentation only. The stopped-container runtime fixture, Docker cleanup semantics, shared-layer reclaim, volume recovery, WSL/VHDX work, and every destructive flow remain open.
 
 ## Storage model
 
