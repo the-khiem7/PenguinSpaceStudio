@@ -12,13 +12,23 @@ import (
 	"github.com/the-khiem7/PenguinSpaceStudio/internal/elevation"
 	"github.com/the-khiem7/PenguinSpaceStudio/internal/history"
 	bunprovider "github.com/the-khiem7/PenguinSpaceStudio/internal/providers/bun"
+	cargoprovider "github.com/the-khiem7/PenguinSpaceStudio/internal/providers/cargo"
+	"github.com/the-khiem7/PenguinSpaceStudio/internal/providers/common"
 	cypressprovider "github.com/the-khiem7/PenguinSpaceStudio/internal/providers/cypress"
+	gradleprovider "github.com/the-khiem7/PenguinSpaceStudio/internal/providers/gradle"
+	mavenprovider "github.com/the-khiem7/PenguinSpaceStudio/internal/providers/maven"
 	npmprovider "github.com/the-khiem7/PenguinSpaceStudio/internal/providers/npm"
 	nugetprovider "github.com/the-khiem7/PenguinSpaceStudio/internal/providers/nuget"
+	playwrightprovider "github.com/the-khiem7/PenguinSpaceStudio/internal/providers/playwright"
 	pnpmprovider "github.com/the-khiem7/PenguinSpaceStudio/internal/providers/pnpm"
 	uvprovider "github.com/the-khiem7/PenguinSpaceStudio/internal/providers/uv"
 	yarnprovider "github.com/the-khiem7/PenguinSpaceStudio/internal/providers/yarn"
 )
+
+type issuedProviderPlan struct {
+	plan          core.CleanupPlan
+	workspaceRoot string
+}
 
 type AppService struct {
 	orchestrator  *core.Orchestrator
@@ -26,7 +36,8 @@ type AppService struct {
 	elevation     *elevation.Controller
 	providerMu    sync.Mutex
 	providers     map[string]core.Provider
-	providerPlans map[string]core.CleanupPlan
+	providerPlans map[string]issuedProviderPlan
+	workspaceRoot string
 }
 
 func NewAppService() (*AppService, error) {
@@ -46,15 +57,19 @@ func NewAppService() (*AppService, error) {
 		history:      store,
 		elevation:    elevation.NewController(elevationStore, newElevationLauncher(), 30*time.Second),
 		providers: map[string]core.Provider{
-			bunprovider.ProviderID:     bunprovider.NewSystemProvider(),
-			cypressprovider.ProviderID: cypressprovider.NewSystemProvider(),
-			nugetprovider.ProviderID:   nugetprovider.NewSystemProvider(),
-			npmprovider.ProviderID:     npmprovider.NewSystemProvider(),
-			pnpmprovider.ProviderID:    pnpmprovider.NewSystemProvider(),
-			uvprovider.ProviderID:      uvprovider.NewSystemProvider(),
-			yarnprovider.ProviderID:    yarnprovider.NewSystemProvider(),
+			bunprovider.ProviderID:        bunprovider.NewSystemProvider(),
+			cargoprovider.ProviderID:      cargoprovider.NewSystemProvider(),
+			cypressprovider.ProviderID:    cypressprovider.NewSystemProvider(),
+			gradleprovider.ProviderID:     gradleprovider.NewSystemProvider(),
+			mavenprovider.ProviderID:      mavenprovider.NewSystemProvider(),
+			nugetprovider.ProviderID:      nugetprovider.NewSystemProvider(),
+			npmprovider.ProviderID:        npmprovider.NewSystemProvider(),
+			playwrightprovider.ProviderID: playwrightprovider.NewSystemProvider(),
+			pnpmprovider.ProviderID:       pnpmprovider.NewSystemProvider(),
+			uvprovider.ProviderID:         uvprovider.NewSystemProvider(),
+			yarnprovider.ProviderID:       yarnprovider.NewSystemProvider(),
 		},
-		providerPlans: make(map[string]core.CleanupPlan),
+		providerPlans: make(map[string]issuedProviderPlan),
 	}, nil
 }
 
@@ -65,7 +80,7 @@ func (s *AppService) Close() error {
 func (s *AppService) Dashboard() core.Dashboard {
 	return core.Dashboard{
 		ApplicationName: "PenguinSpace",
-		Stage:           "M2 Bun, npm, pnpm, uv, Yarn Classic, NuGet, and Cypress providers ready",
+		Stage:           "M2 developer-tool providers ready; project cleanup requires an approved workspace root",
 		SafetyMessage:   "The fixture is no-op; real cleanup requires an inspected backend plan and explicit confirmation.",
 	}
 }
@@ -78,8 +93,26 @@ func (s *AppService) RecentHistory() ([]core.HistoryRecord, error) {
 	return s.history.List(context.Background(), 20)
 }
 
+func (s *AppService) SetWorkspaceRoot(path string) (core.WorkspaceRoot, error) {
+	root, err := common.ValidateWorkspaceRoot(path)
+	if err != nil {
+		return core.WorkspaceRoot{}, err
+	}
+	s.providerMu.Lock()
+	s.workspaceRoot = root
+	s.providerMu.Unlock()
+	return core.WorkspaceRoot{Path: root}, nil
+}
+
 func (s *AppService) InspectDeveloperProvider(providerID string) (core.ProviderInspection, error) {
 	provider, err := s.provider(providerID)
+	if err != nil {
+		return core.ProviderInspection{}, err
+	}
+
+	s.providerMu.Lock()
+	defer s.providerMu.Unlock()
+	workspaceRoot, err := s.configureWorkspaceLocked(provider)
 	if err != nil {
 		return core.ProviderInspection{}, err
 	}
@@ -89,9 +122,7 @@ func (s *AppService) InspectDeveloperProvider(providerID string) (core.ProviderI
 	if err != nil {
 		return core.ProviderInspection{}, err
 	}
-	s.providerMu.Lock()
-	s.providerPlans[providerID] = inspection.Plan
-	s.providerMu.Unlock()
+	s.providerPlans[providerID] = issuedProviderPlan{plan: inspection.Plan, workspaceRoot: workspaceRoot}
 	return inspection, nil
 }
 
@@ -104,33 +135,56 @@ func (s *AppService) ExecuteDeveloperProvider(providerID string, confirmed bool)
 		return core.ProviderCleanupOutcome{}, err
 	}
 	s.providerMu.Lock()
-	plan := s.providerPlans[providerID]
+	issued := s.providerPlans[providerID]
 	delete(s.providerPlans, providerID)
-	s.providerMu.Unlock()
-	if plan.ID == "" {
+	if issued.plan.ID == "" {
+		s.providerMu.Unlock()
 		return core.ProviderCleanupOutcome{}, errors.New("inspect the provider again before cleanup")
 	}
+	if issued.workspaceRoot != "" && !common.SamePath(issued.workspaceRoot, s.workspaceRoot) {
+		s.providerMu.Unlock()
+		return core.ProviderCleanupOutcome{}, errors.New("workspace root changed after review; inspect again before cleanup")
+	}
+	if _, err := s.configureWorkspaceLocked(provider); err != nil {
+		s.providerMu.Unlock()
+		return core.ProviderCleanupOutcome{}, err
+	}
+	s.providerMu.Unlock()
 
 	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
 	defer cancel()
-	execution, err := provider.Execute(ctx, plan, true)
+	execution, err := provider.Execute(ctx, issued.plan, true)
 	if err != nil {
 		return core.ProviderCleanupOutcome{}, err
 	}
-	verification, err := provider.Verify(ctx, plan)
+	verification, err := provider.Verify(ctx, issued.plan)
 	if err != nil {
 		return core.ProviderCleanupOutcome{}, err
 	}
 	if err := s.history.Append(ctx, core.HistoryRecord{
 		ID:             fmt.Sprintf("provider-%d", time.Now().UnixNano()),
-		ProviderID:     plan.ProviderID,
-		PlanID:         plan.ID,
+		ProviderID:     issued.plan.ProviderID,
+		PlanID:         issued.plan.ID,
 		ReclaimedBytes: verification.ReclaimedActual.Bytes,
 		CreatedAt:      time.Now().UTC(),
 	}); err != nil {
 		return core.ProviderCleanupOutcome{}, err
 	}
 	return core.ProviderCleanupOutcome{Execution: execution, Verification: verification}, nil
+}
+
+func (s *AppService) configureWorkspaceLocked(provider core.Provider) (string, error) {
+	scoped, ok := provider.(core.WorkspaceScopedProvider)
+	if !ok {
+		return "", nil
+	}
+	if s.workspaceRoot == "" {
+		return "", errors.New("select an approved workspace root before inspecting this provider")
+	}
+	if err := scoped.SetWorkspaceRoot(s.workspaceRoot); err != nil {
+		return "", err
+	}
+	return s.workspaceRoot, nil
 }
 
 func (s *AppService) provider(providerID string) (core.Provider, error) {

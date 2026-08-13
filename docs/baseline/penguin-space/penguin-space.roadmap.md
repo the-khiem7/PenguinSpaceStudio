@@ -4,7 +4,7 @@ pack: "penguin-space"
 document: "roadmap"
 status: "active"
 updated: "2026-08-13"
-code_ref: "1f7098c"
+code_ref: "163295b"
 ---
 
 # Product roadmap and verification state
@@ -18,7 +18,7 @@ code_ref: "1f7098c"
 | Architecture and usage contract | Complete | Source-code and use-guide documents created because the proposal defines both materially |
 | Root proposal deletion | Complete | Root source removed after SHA-256 equality and pack-coverage verification |
 | Phase 0 — Research and decision closure | Complete with scoped deferrals | Nine decisions were resolved or explicitly deferred in the Phase 0 register; Docker-only toolchain spike passed without a host SDK |
-| Product implementation | M1 complete with two scoped environment deferrals; M2 in progress | Bun 1.x, npm 10/11, conditional pnpm 11/12, uv 0.12.x, Yarn Classic 1.x, .NET SDK 6+ NuGet HTTP cache, and Cypress 13–15 binary-cache prune cover bounded provider lifecycles; Cargo, Gradle, Maven, and Playwright require the M4 workspace contract and are not implemented |
+| Product implementation | M1 complete with two scoped environment deferrals; M2 implementation complete pending bounded Windows UI acceptance | Eleven provider lifecycles are implemented: Bun, npm, conditional pnpm, uv, Yarn Classic, NuGet HTTP cache, Cypress binary cache, Cargo workspace target, Gradle root build output, Maven workspace target, and Playwright hermetic local browsers. The final four require a manually approved root and do not create the wider M4 Project storage surface. |
 
 ## Phase 0 — Research and decision closure
 
@@ -80,6 +80,8 @@ Implement detection, inspection, estimate, plan, cleanup, and verification for N
 
 **uv provider checkpoint (implemented; Windows acceptance completed 2026-08-13):** `internal/providers/uv` supports uv 0.12.x, runs probes from an owned temporary `--directory`, resolves the cache with `uv cache dir`, retains a backend-owned plan, revalidates the path, invokes only `uv cache prune`, and records verified before/after bytes. Initial recursive filesystem measurement exceeded the 30-second UI budget on the real cache; this material failure changed inspection to official `uv cache size --preview-features cache-size` raw bytes. Total cache size is therefore observed, while the pre-prune reclaim estimate remains unavailable. A disposable boundary fixture removed exactly 4,096 bytes inside the uv cache while preserving a 2,048-byte sentinel outside it. Focused tests passed 20 repeated runs; Windows compile-only checks and full Docker `verify` passed binding generation for 9 service methods, 6 enums, and 14 models, Vue build, all internal provider tests, and Windows cross-build. Docker `build` produced `out/penguinspace.exe` (13,655,040 bytes; SHA-256 `ea6416d9a68f63d429c150d3903e556738ff945d36e1c85dcf2381bcfbf46e6b`). On 2026-08-13, the rebuilt Windows UI detected uv 0.12.1, measured 4.35 GiB, rendered the Safe/Download consequences, opened review, and cancelled with 4.35 GiB still displayed; the real cache was not pruned. No Windows Terminal or console window flashed, completing interactive acceptance of the common runner's `CREATE_NO_WINDOW` patch. **Global-cache provider checkpoint (commit `1f7098c`, Docker verified 2026-08-13):** `internal/providers/managedcache` centralizes the fixed global-cache lifecycle, and `AppService` registers three new provider IDs. Yarn accepts only Classic 1.x, resolves `yarn cache dir`, classifies `yarn cache clean` as Review/Download, and excludes modern Yarn caches. NuGet accepts .NET SDK 6 or later, lists/measures and clears only `http-cache` through `dotnet nuget locals`; global packages, temp, and plugins remain excluded. Cypress accepts versions 13–15, resolves the binary cache with `cypress cache path`, and calls only `cypress cache prune`, with unavailable estimate because current-version retention determines actual reclaim. Provider fixtures verify supported/unsupported/missing detection, mandatory confirmation, path revalidation, execution and logical before/after results. Full `docker compose run --rm verify` passed Wails binding generation, frontend typecheck/build, gofmt, `go vet ./internal/...`, `go test ./internal/...`, and Windows production cross-build. Windows interactive UI acceptance has not yet been run for these three providers; real user caches were not deleted. Cargo, Gradle, Maven, and Playwright remain intentionally unimplemented until M4 supplies explicit project/workspace scope.
 
+**Workspace-scoped provider checkpoint (commit `163295b`, Docker verified 2026-08-13):** The minimal `SetWorkspaceRoot` bridge accepts one manually supplied absolute root, then backend validation rejects filesystem roots, home directory, symlinks, target escapes, and a scope change after review. It stores no project root persistently and provides no project discovery, scanner, filter, or analytics. Cargo 1.70+ uses only `cargo clean --manifest-path <approved>/Cargo.toml` for `<approved>/target`; Gradle 8/9 uses only the root regular wrapper with `:clean` for `<approved>/build`; Maven 3/4 uses only `mvn -f <approved>/pom.xml clean` for `<approved>/target`; and Playwright 1.40+ uses a local regular CLI with `PLAYWRIGHT_BROWSERS_PATH=0 uninstall` for hermetic `node_modules/playwright-core/.local-browsers`. Every slice is Review/Rebuild, requires explicit confirmation, revalidates the scope/target, and records measured logical before/after bytes. Full `docker compose run --rm verify` passed Wails bindings (10 methods/15 models), Vue typecheck/build, gofmt, vet, internal tests, and Windows cross-build. Fixture evidence is complete; Windows interactive acceptance for the four new cards remains required and must cancel review without deleting real data.
+
 ## Milestone 3 — Containers and WSL
 
 **Depends on:** Phase 0 Docker/WSL findings; Milestone 1; Docker and Windows/WSL test environments.
@@ -133,7 +135,7 @@ Cover failure recovery, locked files, permission failures, malformed output, par
 
 ## Exact next action
 
-Implement the M4 explicit workspace-root contract before resuming the remaining M2 providers. It must identify one approved project scope, resolve the tool's project-local target within that scope, reject path changes and reparse-point escapes, and produce fixture evidence. Then implement Cargo, Gradle, Maven, and Playwright one at a time using their official project-scoped commands; do not expose global/home-cache deletion as a substitute.
+Run Windows interactive acceptance for Cargo, Gradle, Maven, and Playwright with disposable approved workspaces. For each card: set one valid absolute workspace root, inspect and confirm the detected target/size/consequence, open review, cancel, and verify the displayed measurement remains unchanged and no real user project/browser storage is deleted. Then record the result and close M2 acceptance.
 
 ## Pack migration verification
 

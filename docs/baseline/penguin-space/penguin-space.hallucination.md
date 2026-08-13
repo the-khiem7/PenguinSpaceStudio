@@ -4,7 +4,7 @@ pack: "penguin-space"
 document: "hallucination"
 status: "active"
 updated: "2026-08-13"
-code_ref: "1f7098c"
+code_ref: "163295b"
 ---
 
 # Decisions, unknowns, and claim boundaries
@@ -37,7 +37,7 @@ The following are approved and must not be re-litigated during implementation wi
 
 The following proposal guidance is product research, not runtime-confirmed implementation truth. Revalidate it against official documentation and installed versions before encoding it:
 
-- Exact cleanup commands and behaviour for Cargo, Gradle, Maven, Playwright, and Docker. Current bounded lifecycle evidence covers Bun, npm, conditional pnpm, uv, Yarn Classic 1.x, .NET SDK 6+ NuGet HTTP cache, and Cypress 13–15 binary-cache prune; it does not authorize scope expansion or cleanup of excluded storage.
+- Exact cleanup commands and behaviour for Docker. Current bounded lifecycle evidence covers Bun, npm, conditional pnpm, uv, Yarn Classic 1.x, .NET SDK 6+ NuGet HTTP cache, Cypress 13–15 binary-cache prune, Cargo 1.70+ workspace target, Gradle 8/9 root build output, Maven 3/4 workspace target, and Playwright 1.40+ hermetic local browsers; it does not authorize scope expansion or cleanup of excluded storage.
 - Current Wails 3 API, lifecycle, system-tray, window, and packaging behaviour beyond the Phase 0 CLI/install and Windows cross-build research.
 - Windows and WSL/VHDX compaction requirements, privileges, supported paths, and recovery behaviour.
 - Wails installer/package creation and interactive Windows UI behavior. A Docker-built Windows executable has passed only a hidden process-start smoke test.

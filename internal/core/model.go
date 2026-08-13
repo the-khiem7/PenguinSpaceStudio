@@ -117,6 +117,15 @@ type ProviderCleanupOutcome struct {
 	Verification VerificationResult `json:"verification"`
 }
 
+type WorkspaceRoot struct {
+	Path string `json:"path"`
+}
+
+type WorkspaceScopedProvider interface {
+	Provider
+	SetWorkspaceRoot(root string) error
+}
+
 type Provider interface {
 	ID() string
 	ExecutionEnabled() bool

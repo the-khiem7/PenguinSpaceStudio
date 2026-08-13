@@ -10,6 +10,9 @@ const error = ref("");
 const running = ref(false);
 const elevation = ref<ElevationStatus | null>(null);
 const elevationStarting = ref(false);
+const workspaceRootInput = ref("");
+const workspaceRoot = ref("");
+const workspaceSaving = ref(false);
 const detectedDeveloperProviders = ref<Record<string, string>>({});
 let elevationPoller: ReturnType<typeof setInterval> | undefined;
 
@@ -75,6 +78,19 @@ async function cancelElevationProbe() {
     elevation.value = await backend.cancelElevationProbe();
   } catch (cause) {
     error.value = `Elevation probe cancellation failed: ${String(cause)}`;
+  }
+}
+
+async function saveWorkspaceRoot() {
+  workspaceSaving.value = true;
+  error.value = "";
+  try {
+    const root = await backend.setWorkspaceRoot(workspaceRootInput.value);
+    workspaceRoot.value = root.path;
+  } catch (cause) {
+    error.value = `Workspace root was not accepted: ${String(cause)}`;
+  } finally {
+    workspaceSaving.value = false;
   }
 }
 
@@ -164,6 +180,21 @@ function recordProviderDetection(payload: { providerId: string; label: string; d
         </aside>
       </section>
 
+      <section class="panel workspace-scope" aria-labelledby="workspace-scope-title">
+        <div class="panel-heading">
+          <div>
+            <p class="eyebrow">Project-scoped cleanup prerequisite</p>
+            <h2 id="workspace-scope-title">Approved workspace root</h2>
+          </div>
+        </div>
+        <p class="muted">Cargo, Gradle, Maven, and Playwright only inspect targets inside this one backend-validated directory. Changing it invalidates any reviewed project cleanup plan.</p>
+        <div class="probe-actions">
+          <input v-model="workspaceRootInput" aria-label="Approved workspace root path" placeholder="Absolute project path" type="text" />
+          <button :disabled="workspaceSaving || !workspaceRootInput.trim()" @click="saveWorkspaceRoot">{{ workspaceSaving ? "Validating…" : "Use workspace" }}</button>
+        </div>
+        <p class="muted">{{ workspaceRoot ? `Approved: ${workspaceRoot}` : "No workspace root approved." }}</p>
+      </section>
+
       <section class="provider-stack" id="developer-tools" aria-label="Developer tool providers">
         <ProviderCard
           provider-id="bun.global-cache"
@@ -219,6 +250,38 @@ function recordProviderDetection(payload: { providerId: string; label: string; d
           title="Cypress binary cache"
           inspect-label="Inspect Cypress cache"
           description="Prunes older downloaded Cypress binaries while retaining the binary currently in use. The observed total is not a reclaim estimate."
+          @detection="recordProviderDetection"
+        />
+        <ProviderCard
+          provider-id="cargo.workspace-target"
+          provider-label="Cargo"
+          title="Cargo workspace target"
+          inspect-label="Inspect Cargo target"
+          description="Requires the approved workspace to contain Cargo.toml. Cleans only its target output; Cargo home storage is excluded."
+          @detection="recordProviderDetection"
+        />
+        <ProviderCard
+          provider-id="gradle.workspace-build"
+          provider-label="Gradle"
+          title="Gradle root build output"
+          inspect-label="Inspect Gradle build"
+          description="Requires a regular Gradle wrapper and root build/settings file. Runs only the root clean task; Gradle User Home is excluded."
+          @detection="recordProviderDetection"
+        />
+        <ProviderCard
+          provider-id="maven.workspace-target"
+          provider-label="Maven"
+          title="Maven workspace target"
+          inspect-label="Inspect Maven target"
+          description="Requires pom.xml in the approved workspace and runs only Maven clean. The shared local repository is excluded."
+          @detection="recordProviderDetection"
+        />
+        <ProviderCard
+          provider-id="playwright.hermetic-browsers"
+          provider-label="Playwright"
+          title="Playwright hermetic browsers"
+          inspect-label="Inspect local Playwright browsers"
+          description="Supports only browsers installed hermetically inside this workspace. Shared browser cache and --all removal are excluded."
           @detection="recordProviderDetection"
         />
       </section>

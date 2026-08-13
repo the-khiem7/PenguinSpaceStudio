@@ -19,12 +19,28 @@ type CommandRunner interface {
 
 type SystemRunner struct{}
 
+type EnvironmentCommandRunner interface {
+	CommandRunner
+	RunWithEnv(ctx context.Context, executable string, environment []string, arguments ...string) (string, error)
+}
+
 func (SystemRunner) LookPath(name string) (string, error) {
 	return exec.LookPath(name)
 }
 
 func (SystemRunner) Run(ctx context.Context, executable string, arguments ...string) (string, error) {
+	return runCommand(ctx, executable, nil, arguments...)
+}
+
+func (SystemRunner) RunWithEnv(ctx context.Context, executable string, environment []string, arguments ...string) (string, error) {
+	return runCommand(ctx, executable, environment, arguments...)
+}
+
+func runCommand(ctx context.Context, executable string, environment []string, arguments ...string) (string, error) {
 	command := exec.CommandContext(ctx, executable, arguments...)
+	if len(environment) > 0 {
+		command.Env = append(os.Environ(), environment...)
+	}
 	configureCommand(command)
 	output, err := command.CombinedOutput()
 	if err != nil {

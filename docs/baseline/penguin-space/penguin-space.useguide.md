@@ -4,12 +4,12 @@ pack: "penguin-space"
 document: "useguide"
 status: "draft"
 updated: "2026-08-13"
-code_ref: "1f7098c"
+code_ref: "163295b"
 ---
 
 # Intended product interaction contract
 
-This is the Product Goal interaction contract. M1 implements its left-navigation shell, fixture lifecycle, and partially runtime-verified Windows UAC probe. Commit `1f7098c` adds reusable Developer Tools workflows for Bun, npm, conditional pnpm, uv, Yarn Classic, NuGet HTTP cache, and Cypress binary cache. Cargo, Gradle, Maven, and Playwright remain planned because their cleanup requires explicit project/workspace scope from M4; no provider may substitute a broad user-home deletion.
+This is the Product Goal interaction contract. M1 implements its left-navigation shell, fixture lifecycle, and partially runtime-verified Windows UAC probe. Commit `163295b` adds the minimal approved workspace-root contract plus Developer Tools workflows for Cargo, Gradle, Maven, and Playwright hermetic local browsers; it deliberately does not add Project storage page, broad discovery, filters, or analytics. The prior M2 providers—Bun, npm, conditional pnpm, uv, Yarn Classic, NuGet HTTP cache, and Cypress binary cache—remain available.
 
 The UAC panel's **Test Windows consent** action is a fixed no-op probe, not a cleanup request. Commit `8fc559a` disables every start action immediately while a start is pending or active, so a second click cannot surface the previous stale `already in progress` error. Commit `d0bc468` starts the bounded execution window only after Windows elevation launches. **Test cancellation** starts a delayed no-op; select **Cancel probe** while it is active. **Test timeout** outlives the fixed execution window and ends as `timed-out`. On 2026-08-12, computer-controlled acceptance against the rebuilt executable observed `Succeeded`, `Cancelled`, and `Timed-Out`, each with explicit no-cleanup wording where applicable. These controls still cannot invoke a cleanup provider or shell command.
 
