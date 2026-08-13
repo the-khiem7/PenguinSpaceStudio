@@ -4,7 +4,7 @@ pack: "penguin-space"
 document: "hallucination"
 status: "active"
 updated: "2026-08-13"
-code_ref: "163295b"
+code_ref: "31bd100 (M3.1 accepted on Windows via v0.1.2)"
 ---
 
 # Decisions, unknowns, and claim boundaries
@@ -16,17 +16,18 @@ code_ref: "163295b"
 - Commit `d97fa27` contains the current discovery-first provider surface and versioned artifact pipeline. Docker verification passed binding generation (11 methods/16 models), Vue type-check/build, gofmt, vet, internal tests, and Windows cross-build.
 - `out/penguinspace-v0.1.1.exe` was built with explicit version `0.1.1`, preserving `out/penguinspace-v0.1.0.exe` and `out/penguinspace.exe`.
 - The user confirmed the `v0.1.1` Windows UI behavior: only available host providers receive Inspect cards; pnpm without `storeDir` is a setup notice; unavailable tools are collapsed; and project providers are absent before selecting a workspace.
+- M3.1 source implements a fixed read-only Docker CLI sequence and a five-category UI. Docker verification passed 12 service methods and 19 models plus frontend build, gofmt, vet, tests, and Windows cross-build. `out/penguinspace-v0.1.2.exe` (13,789,696 bytes; SHA-256 `ffbe4ded8f938d9cf9ca09f3cbba883487c30a3a7712f30a75410392a53923ce`) passed user-confirmed Windows acceptance: daemon-available rendering showed exactly five categories with Stateful volumes and no cleanup control; after Rancher Desktop stopped, refresh reported daemon unavailable and removed all resource cards without stale data.
 
 **Decisions now in force**
 
-- Discovery is capability-first: startup detection is bounded and read-only; it must not measure bytes, issue a cleanup plan, or execute cleanup.
+- Developer-provider discovery is capability-first: its startup detection is bounded and read-only; it must not measure bytes, issue a cleanup plan, or execute cleanup. M3.1 Docker awareness is a separate read-only observation path that may request daemon-wide measurements.
 - A host-only provider must not claim to inspect a toolchain or cache held only inside Docker. The Docker-first IRYS Rust project is therefore outside the Cargo host-provider scope.
 - Windows packaging requires an explicit semantic version and produces `out/penguinspace-v<version>.exe`. Existing artifacts and a potentially running executable are never overwritten automatically.
-- M3 begins with Docker awareness in read-only mode. `docker system prune`, `docker builder prune`, and volume cleanup are not authorized by this decision.
+- M3.1 Docker awareness is observation-only. The backend may invoke only fixed version/list/disk-usage commands; it accepts no frontend Docker argument and exposes no plan or executor. `docker system prune`, `docker builder prune`, and volume cleanup remain unauthorized.
 
 **Open questions and required evidence**
 
-- Docker daemon/resource discovery must establish exact ownership labels, measurement semantics, and behavior when the daemon is unavailable before any cleanup plan is designed.
+- M3.1 daemon-available and daemon-unavailable Windows behavior is runtime-confirmed. Ownership labels and cleanup semantics remain unresolved and must not be inferred from counts or disk-usage summaries. Rancher Desktop is currently stopped and requires operator restart before further Docker evidence collection.
 - BuildKit cache may be global/shared; it must not be attributed to one workspace without evidence.
 - Docker volumes remain persistent-state candidates and require a separate Danger workflow plus real recovery/verification evidence before any cleanup is enabled.
 - The four host workspace providers still need optional visual acceptance against a disposable host-native project; this is not evidence for Docker-held project artifacts.

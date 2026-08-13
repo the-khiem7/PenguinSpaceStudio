@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref } from "vue";
-import { backend, ElevationProbeMode, type ElevationStatus, type ProviderAvailability, type Scenario } from "./backend";
+import { backend, ElevationProbeMode, type DockerAwareness, type ElevationStatus, type ProviderAvailability, type Scenario } from "./backend";
 import ProviderCard from "./components/ProviderCard.vue";
 
 type ProviderDefinition = {
@@ -39,6 +39,9 @@ const workspaceSaving = ref(false);
 const providerAvailability = ref<ProviderAvailability[]>([]);
 const discoveryLoading = ref(false);
 const discoveryError = ref("");
+const dockerAwareness = ref<DockerAwareness | null>(null);
+const dockerLoading = ref(false);
+const dockerError = ref("");
 let elevationPoller: ReturnType<typeof setInterval> | undefined;
 
 const reclaimed = computed(() => scenario.value?.verification.reclaimedActual.bytes ?? 0);
@@ -76,6 +79,7 @@ onMounted(async () => {
     error.value = `Backend connection failed: ${String(cause)}`;
   }
   await refreshDeveloperProviders();
+  await refreshDockerAwareness();
   elevationPoller = setInterval(async () => {
     const status = await backend.elevationStatus();
     if (status.id) elevation.value = status;
@@ -96,6 +100,27 @@ async function refreshDeveloperProviders() {
   } finally {
     discoveryLoading.value = false;
   }
+}
+
+async function refreshDockerAwareness() {
+  dockerLoading.value = true;
+  dockerError.value = "";
+  dockerAwareness.value = null;
+  try {
+    dockerAwareness.value = await backend.inspectDockerAwareness();
+  } catch (cause) {
+    dockerError.value = `Docker awareness failed: ${String(cause)}`;
+  } finally {
+    dockerLoading.value = false;
+  }
+}
+
+function formatBytes(bytes: number, kind: string) {
+  if (kind === "unavailable") return "Not reported";
+  if (bytes === 0) return "0 B";
+  const units = ["B", "KiB", "MiB", "GiB", "TiB"];
+  const exponent = Math.min(Math.floor(Math.log(bytes) / Math.log(1024)), units.length - 1);
+  return `${(bytes / 1024 ** exponent).toLocaleString(undefined, { maximumSignificantDigits: 3 })} ${units[exponent]}`;
 }
 
 async function runFixture() {
@@ -230,6 +255,47 @@ function availabilityMessage(providerID: string) {
             </div>
           </div>
         </aside>
+      </section>
+
+      <section id="containers" class="provider-category docker-awareness" aria-labelledby="docker-awareness-title">
+        <div class="provider-category-heading">
+          <div>
+            <p class="eyebrow">M3.1 · Read-only</p>
+            <h2 id="docker-awareness-title">Docker daemon awareness</h2>
+            <p class="muted">Images, stopped containers, BuildKit cache, custom networks, and volumes are inspected independently. No cleanup command is exposed.</p>
+          </div>
+          <button class="secondary" :disabled="dockerLoading" @click="refreshDockerAwareness">{{ dockerLoading ? "Inspecting…" : "Refresh Docker" }}</button>
+        </div>
+        <p v-if="dockerError" class="error" role="alert">{{ dockerError }}</p>
+        <p v-else-if="dockerLoading && !dockerAwareness" class="muted provider-loading">Checking Docker daemon and resource categories…</p>
+        <div v-else-if="dockerAwareness" class="docker-status">
+          <article class="panel docker-daemon" :class="{ available: dockerAwareness.daemon.available }">
+            <div>
+              <span class="status"><i></i>{{ dockerAwareness.daemon.available ? "Daemon available" : "Daemon unavailable" }}</span>
+              <strong v-if="dockerAwareness.daemon.available">Docker {{ dockerAwareness.daemon.version }} · {{ dockerAwareness.daemon.operatingSystem }}/{{ dockerAwareness.daemon.architecture }}</strong>
+              <strong v-else>Docker resources were not inspected</strong>
+            </div>
+            <small>{{ dockerAwareness.daemon.message }}</small>
+          </article>
+          <div v-if="dockerAwareness.daemon.available" class="docker-resource-grid">
+            <article v-for="resource in dockerAwareness.resources" :key="resource.kind" class="panel docker-resource" :class="{ stateful: resource.stateful }">
+              <div class="docker-resource-heading">
+                <strong>{{ resource.name }}</strong>
+                <span v-if="resource.stateful" class="danger-tag">Stateful</span>
+                <span v-else class="readonly-tag">Read-only</span>
+              </div>
+              <div class="docker-resource-metrics">
+                <span><b>{{ resource.countAvailable ? resource.count : "—" }}</b><small>items</small></span>
+                <span><b>{{ formatBytes(resource.size.bytes, resource.size.kind) }}</b><small>daemon size</small></span>
+                <span><b>{{ formatBytes(resource.reclaimable.bytes, resource.reclaimable.kind) }}</b><small>reported reclaimable</small></span>
+              </div>
+              <p>{{ resource.boundary }}</p>
+            </article>
+          </div>
+          <ul v-if="dockerAwareness.warnings?.length" class="docker-warnings">
+            <li v-for="warning in dockerAwareness.warnings" :key="warning">{{ warning }}</li>
+          </ul>
+        </div>
       </section>
 
       <section id="workspace-scope" class="panel workspace-scope" aria-labelledby="workspace-scope-title">

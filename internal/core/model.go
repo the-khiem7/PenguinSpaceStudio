@@ -160,6 +160,34 @@ type Provider interface {
 	Verify(ctx context.Context, plan CleanupPlan) (VerificationResult, error)
 }
 
+type DockerDaemonStatus struct {
+	CLIAvailable    bool   `json:"cliAvailable"`
+	Available       bool   `json:"available"`
+	ExecutablePath  string `json:"executablePath,omitempty"`
+	Version         string `json:"version,omitempty"`
+	OperatingSystem string `json:"operatingSystem,omitempty"`
+	Architecture    string `json:"architecture,omitempty"`
+	Message         string `json:"message"`
+}
+
+type DockerResourceSummary struct {
+	Kind           string      `json:"kind"`
+	Name           string      `json:"name"`
+	Count          uint64      `json:"count"`
+	CountAvailable bool        `json:"countAvailable"`
+	Size           Measurement `json:"size"`
+	Reclaimable    Measurement `json:"reclaimable"`
+	Stateful       bool        `json:"stateful"`
+	Boundary       string      `json:"boundary"`
+}
+
+type DockerAwareness struct {
+	Daemon      DockerDaemonStatus      `json:"daemon"`
+	InspectedAt time.Time               `json:"inspectedAt"`
+	Resources   []DockerResourceSummary `json:"resources"`
+	Warnings    []string                `json:"warnings"`
+}
+
 type Dashboard struct {
 	ApplicationName string `json:"applicationName"`
 	Stage           string `json:"stage"`

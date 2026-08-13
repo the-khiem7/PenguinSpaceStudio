@@ -4,7 +4,7 @@ pack: "penguin-space"
 document: "introduction"
 status: "active"
 updated: "2026-08-13"
-code_ref: "163295b"
+code_ref: "31bd100 (M3.1 accepted on Windows via v0.1.2)"
 ---
 
 # PenguinSpace baseline
@@ -40,7 +40,7 @@ It is not a generic PC cleaner or merely a GUI for cache-clearing commands. Its 
 - Milestone 1 bootstrap implementation is committed in `5ba3fe8`: a pinned Docker toolchain, Wails/Go/Vue shell, SQLite history store, and a fixture-only provider lifecycle.
 - The M1 elevation probe is committed in `6ee788d`: it has a fixed action allow-list, per-operation Windows `runas` launcher, cancellation and timeout states, and a UI control. Docker verification, Windows cross-build, and a hidden process-start smoke test passed. On 2026-08-11 the user exercised the visible UI and observed the no-op probe reach `Succeeded`; it still has no cleanup provider or arbitrary shell-command channel.
 - The root `PROPOSAL.md`, which was an already staged newly added file, was removed after byte-identical preservation in this pack.
-- Product decisions are approved direction, not runtime proof. Implemented evidence is limited to the M1 fixture/elevation and bounded M2 provider slices: Bun 1.x, npm 10/11, conditional pnpm 11/12, uv 0.12.x, Yarn Classic 1.x, .NET SDK 6+ NuGet HTTP cache, Cypress 13–15 binary-cache prune, Cargo 1.70+ workspace target, Gradle 8/9 root build output, Maven 3/4 workspace target, and Playwright 1.40+ hermetic local browsers. Docker/WSL cleanup, VHDX operations, packaging, and release behaviour remain planned or deferred as recorded in the roadmap. Windows UI acceptance remains pending for the four project-scoped M2 cards; no real project output or browser storage was deleted.
+- Product decisions are approved direction, not runtime proof. Implemented evidence includes the M1 fixture/elevation, all bounded M2 provider slices, and M3.1 read-only Docker awareness. M3.1 detects the daemon and independently reports images, stopped containers, BuildKit cache, custom networks, and volumes; it exposes no cleanup plan or mutation. Docker cleanup, WSL/VHDX operations, packaging, and release behaviour remain planned or deferred as recorded in the roadmap.
 - Docker-only verification and Windows cross-build pass through Compose. The generated Windows executable launched successfully for five seconds on the host in a hidden smoke test, then was stopped; this is process-start evidence, not interactive UI acceptance.
 - The fixture lifecycle scans, plans, requires confirmation, executes only an in-memory change, verifies exact reclaimed bytes, and persists a history record. It is not an implementation of any real cleanup provider or command.
 - Commit `d0bc468` upgrades the no-op elevation request to contract version 2 and activates its bounded 30-second execution window only after the Windows launcher returns successfully. The helper waits for that activation, so operator consent time no longer consumes execution time; repeated regression tests cover slow consent, timeout after consent, refusal mapping, cancellation, and allow-list validation. Docker `verify` and `build` passed and produced `out/penguinspace.exe` (13,556,736 bytes; SHA-256 `f606c7a33c6ee13856db965cea2193c2e43197018fee30b6bbf078921125c4f1`). On the Windows host with UAC set to Never notify, the rebuilt executable reached `Succeeded`, `Cancelled`, and `Timed-Out`; its visible fixture lifecycle completed 3.00 MiB through scan, plan, backend confirmation, no-filesystem execution, and verification. Interactive refusal remains unverified because this host configuration auto-approves `runas` without presenting a rejectable prompt.
@@ -56,6 +56,16 @@ It is not a generic PC cleaner or merely a GUI for cache-clearing commands. Its 
 - IRYS is a Docker-first Rust project. Its Cargo toolchain, manifest/build context, and build artifacts are outside the current host-workspace Cargo provider, so the absence of a Cargo card is expected and must not be interpreted as the project being non-Rust.
 - The next implementation scope is M3.1 Docker awareness in read-only mode: discover daemon availability and separately report images, stopped containers, BuildKit cache, networks, and volumes. It must not execute cleanup, invoke global prune, or treat volumes as ordinary cache. Docker cleanup semantics and ownership/scoping evidence remain open.
 - A host-native disposable workspace still provides optional follow-up acceptance for Cargo, Gradle, Maven, and Playwright, but it does not resolve the Docker-first IRYS case.
+
+## Save checkpoint — M3.1 read-only Docker awareness
+
+**Code reference:** `31bd100`; Windows acceptance artifact `out/penguinspace-v0.1.2.exe`.
+
+- `internal/dockerinventory` uses a fixed CLI allow-list to detect the Docker daemon and inspect five separate categories: images, stopped containers, BuildKit cache, custom networks, and volumes. Disk-usage summaries are daemon-wide; counts come from category-specific list commands, and no project ownership is inferred.
+- The Containers & WSL UI reports count, daemon size, and daemon-reported reclaimable size where available. Volumes are visually Stateful and remain Danger scope. No Docker cleanup button, plan, prune command, or volume mutation exists.
+- Docker verification passed bindings (12 methods/19 models), frontend type-check/build, formatting, vet, internal tests, and Windows cross-build. `v0.1.2` is 13,789,696 bytes with SHA-256 `ffbe4ded8f938d9cf9ca09f3cbba883487c30a3a7712f30a75410392a53923ce`.
+- User-supplied Windows screenshots complete M3.1 acceptance. With Docker 29.5.3 available, the UI showed exactly five categories, volumes as Stateful, and no cleanup control. After Rancher Desktop was stopped, refresh showed daemon unavailable and no stale resource cards. Rancher remains stopped and must be restarted by the operator before further Docker runtime work.
+- The next ready scope is M3.2 ownership/scoping evidence only. Cleanup semantics, BuildKit attribution, and volume recovery remain open and block destructive Docker work.
 
 ## Storage model
 

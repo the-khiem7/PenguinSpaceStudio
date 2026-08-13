@@ -4,7 +4,7 @@ pack: "penguin-space"
 document: "roadmap"
 status: "active"
 updated: "2026-08-13"
-code_ref: "working tree (post-163295b)"
+code_ref: "31bd100 (M3.1 accepted on Windows via v0.1.2)"
 ---
 
 # Product roadmap and verification state
@@ -18,7 +18,7 @@ code_ref: "working tree (post-163295b)"
 | Architecture and usage contract | Complete | Source-code and use-guide documents created because the proposal defines both materially |
 | Root proposal deletion | Complete | Root source removed after SHA-256 equality and pack-coverage verification |
 | Phase 0 — Research and decision closure | Complete with scoped deferrals | Nine decisions were resolved or explicitly deferred in the Phase 0 register; Docker-only toolchain spike passed without a host SDK |
-| Product implementation | M1 complete with two scoped environment deferrals; M2 provider implementation and discovery-first UI complete pending bounded Windows UI acceptance | Eleven provider lifecycles are implemented: Bun, npm, conditional pnpm, uv, Yarn Classic, NuGet HTTP cache, Cypress binary cache, Cargo workspace target, Gradle root build output, Maven workspace target, and Playwright hermetic local browsers. The UI now displays full cards only for supported host providers; the final four still require a manually approved root and do not create the wider M4 Project storage surface. |
+| Product implementation | M1 complete with two scoped environment deferrals; M2 complete; M3.1 read-only Docker awareness accepted on Windows | Eleven developer-tool lifecycles and discovery-first UI are complete. Docker daemon awareness reports five independent resource classes without cleanup; `v0.1.2` acceptance passed with the daemon both available and unavailable. |
 
 ## Phase 0 — Research and decision closure
 
@@ -94,6 +94,8 @@ Implement Docker/Docker Desktop/Rancher awareness; independent resource inspecti
 
 **Verification gate:** real Docker and WSL/VHDX scenarios, including daemon unavailable, a running distro, elevation refusal, and interrupted compaction.
 
+**M3.1 implementation and acceptance checkpoint (2026-08-13):** `internal/dockerinventory` performs a fixed, bounded, read-only Docker CLI sequence. It detects the server through `docker version`, reads daemon-wide logical size/reclaimable summaries, and independently counts unique images, stopped containers, BuildKit records, custom networks, and volumes. `AppService.InspectDockerAwareness` exposes only observation models under a 20-second context; Vue renders five resource categories, unavailable measurements, partial-inspection warnings, and a distinct Stateful volume treatment. There is no cleanup plan, executor, user-provided Docker argument, prune command, or volume mutation path. Full `docker compose run --rm verify` passed generated bindings (12 methods/19 models), Vue type-check/build, gofmt, vet, all internal tests, and Windows cross-build. `out/penguinspace-v0.1.2.exe` was built at 13,789,696 bytes with SHA-256 `ffbe4ded8f938d9cf9ca09f3cbba883487c30a3a7712f30a75410392a53923ce`. User-supplied Windows screenshots verify Docker 29.5.3 (`linux/amd64`) with exactly five categories, volumes marked Stateful, and no cleanup control. After Rancher Desktop was stopped, refresh reported daemon unavailable, removed all resource cards, and retained no stale observations. M3.1 acceptance is complete; Rancher remains stopped by operator choice.
+
 ## Milestone 4 — Project storage
 
 **Depends on:** Milestone 1 scanner and workspace configuration.
@@ -137,7 +139,7 @@ Cover failure recovery, locked files, permission failures, malformed output, par
 
 ## Exact next action
 
-Run Windows interactive acceptance for `out\penguinspace-v0.1.1.exe`. At launch, verify that only supported host providers appear as full Inspect cards, pnpm without an explicit `storeDir` is a configuration notice, and unavailable host tools are collapsed rather than rendered with `—` values. Then choose a disposable approved workspace: verify a project provider appears only when its marker and host prerequisite are available; cancel any review without deleting data. Docker-only Cargo projects must remain outside the host-provider cards. Record the visual evidence before closing the M2 discovery-first acceptance.
+Begin M3.2 as a non-destructive Docker ownership/scoping evidence phase. With Rancher Desktop explicitly restarted by the operator, capture Compose/project labels and resource relationships for disposable images, stopped containers, custom networks, and volumes; determine which observations can be safely grouped without attributing shared BuildKit cache to one workspace. Produce a decision record only—do not add cleanup, prune, or volume mutation until ownership and recovery semantics are closed.
 
 ## Save checkpoint — 2026-08-13
 
@@ -146,7 +148,7 @@ This checkpoint supersedes the earlier **Exact next action** acceptance instruct
 - **M2 discovery-first UI:** complete and user-confirmed. Available host providers render as full cards, pnpm without explicit `storeDir` is a configuration notice, unavailable tools are collapsed, and project provider cards remain absent until a matching approved workspace exists.
 - **Build evidence:** `d97fa27`; `docker compose run --rm verify` passed bindings (11 methods/16 models), Vue typecheck/build, gofmt, vet, internal tests, and Windows cross-build. `scripts/build-windows.ps1 -Version 0.1.1` produced `out/penguinspace-v0.1.1.exe` without overwriting prior artifacts.
 - **Boundary confirmed:** IRYS is Docker-first. Its Cargo project/build cache is not observable through the host-only Cargo provider; this is expected behavior, not an M2 detection defect.
-- **Next implementation action:** M3.1 Docker awareness, read-only only. Implement bounded daemon detection and independent inspection of images, stopped containers, BuildKit cache, networks, and volumes. Do not add any cleanup action, broad prune command, or volume mutation in this phase.
+- **Next implementation action:** M3.1 read-only Docker awareness is accepted on Windows through `out/penguinspace-v0.1.2.exe`. M3.2 should gather Docker ownership/scoping evidence only after the operator restarts Rancher Desktop; no cleanup planning is authorized yet.
 - **Still unverified:** Docker resource ownership and cleanup semantics; BuildKit attribution; volume recovery; UAC refusal; and optional host-native visual acceptance for Cargo/Gradle/Maven/Playwright.
 
 ## Pack migration verification

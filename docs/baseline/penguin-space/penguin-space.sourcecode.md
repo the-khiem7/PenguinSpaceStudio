@@ -4,7 +4,7 @@ pack: "penguin-space"
 document: "sourcecode"
 status: "active"
 updated: "2026-08-13"
-code_ref: "working tree (post-163295b)"
+code_ref: "working tree (M3.1 read-only Docker awareness)"
 ---
 
 # Architecture and implementation
@@ -70,6 +70,12 @@ The UI can display a plan only after classification. A plan must expose provider
 
 For Bun, the current UI exposes logical measurement and the consequence that hardlinks can make physical reclaim lower. For npm, it exposes only `_cacache` bytes and warns that logs/npx are out of scope. For pnpm, an implicit per-disk store produces detection plus an explanation but no action; an explicit `storeDir` produces observed total bytes and an unavailable estimate until `store prune` completes. For uv, the total cache is observed while reclaimable bytes remain unavailable until prune; the consequence explicitly includes removal of centralized project environments and possible package downloads or source rebuilds. Yarn is limited to Classic 1.x global cache via `yarn cache dir` and `yarn cache clean`; modern Yarn caches remain excluded without M4 project context. NuGet is limited to the .NET SDK 6+ `http-cache` list/clear pair; global packages, temp, and plugins remain excluded. Cypress 13–15 measures its binary-cache root and uses only `cypress cache prune`, so its pre-prune reclaim estimate remains unavailable and the currently used binary is retained. Each new provider test covers supported/unsupported or missing detection, plan classification, required confirmation, scope change rejection, execution, and verified logical measurement. Cargo, Gradle, Maven, and Playwright use only the minimal approved workspace-root contract; broad project discovery, recursive scanning, filters, and analytics remain deferred to M4. None claims physical reclaimed bytes.
 
+## M3.1 read-only Docker awareness
+
+`internal/dockerinventory.Inspector` owns a fixed observation sequence through the existing no-console command runner. It first resolves `docker`, checks the server with a JSON-formatted version request, then reads daemon-wide disk-usage summaries and independently lists unique images, stopped containers, BuildKit cache records, custom networks, and volumes. Every invocation has hard-coded arguments; no Docker command, filter, ID, or path crosses from Vue. Missing CLI or daemon produces a non-actionable status, while category-level failures produce warnings and unavailable fields rather than invented zero-byte claims.
+
+`AppService.InspectDockerAwareness` applies a 20-second context and returns `DockerAwareness`, `DockerDaemonStatus`, and ordered `DockerResourceSummary` models. The model separates count availability from byte measurement availability and labels volumes as stateful. Category commands provide counts; disk-usage byte summaries are daemon-wide. Stopped-container bytes remain unavailable rather than mixing their count with all-container storage, and the BuildKit boundary does not claim that active-builder record count is project ownership. The Vue Containers & WSL surface displays these observations but has no review, plan, execute, prune, or delete path. `docker system df` values are not physical Windows/VHDX reclaim evidence and are not attributed to a workspace.
+
 ## Required core models
 
 - Provider and detected environment
@@ -83,9 +89,9 @@ For Bun, the current UI exposes logical measurement and the consequence that har
 
 ## Docker and WSL design constraints
 
-Docker inspection and cleanup must distinguish build cache, images, stopped containers, networks, and volumes. Volumes are persistent-state candidates and therefore Danger.
+Docker M3.1 inspection distinguishes build cache, images, stopped containers, custom networks, and volumes. Volumes are persistent-state candidates and visually Stateful/Danger, but this slice exposes no cleanup. Category counts and daemon-wide `docker system df` summaries are distinct observations, not project ownership or physical-host reclaim claims; stopped-container bytes remain unavailable because the daemon summary includes all containers.
 
-WSL/VHDX needs a separate measurement path: distro/filesystem logical usage, backing VHDX path, physical size, estimated compactability, and physical size after compaction. Logical deletion is never evidence of host-disk reclaim until post-operation verification.
+Future Docker cleanup must preserve these categories and establish ownership/scoping evidence before planning. WSL/VHDX needs a separate measurement path: distro/filesystem logical usage, backing VHDX path, physical size, estimated compactability, and physical size after compaction. Logical deletion is never evidence of host-disk reclaim until post-operation verification.
 
 ## Proposed UI architecture
 

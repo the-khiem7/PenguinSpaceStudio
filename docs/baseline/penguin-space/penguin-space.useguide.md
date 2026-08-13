@@ -4,7 +4,7 @@ pack: "penguin-space"
 document: "useguide"
 status: "draft"
 updated: "2026-08-13"
-code_ref: "working tree (post-163295b)"
+code_ref: "31bd100 (M3.1 accepted on Windows via v0.1.2)"
 ---
 
 # Intended product interaction contract
@@ -25,7 +25,15 @@ Use horizontal desktop space deliberately: metric rows, horizontal storage bars,
 
 At launch, PenguinSpace performs bounded availability checks only; it does not measure storage, issue a cleanup plan, or remove data. **Available caches** contains supported host providers that can be inspected. **Configuration required** is reserved for detected providers that need a safe prerequisite, such as pnpm needing an explicit `storeDir`. **Unavailable on this machine** is collapsed and retains an explanatory diagnostic rather than creating large empty cards.
 
-After a workspace root is approved, the application checks project markers before showing project provider cards. A root without `Cargo.toml`, Gradle root configuration, `pom.xml`, or `package.json` does not show the corresponding provider. A project built exclusively inside Docker can therefore have no Cargo card: host-provider discovery does not claim to inspect Cargo or build cache that exists only inside containers. Docker resource inspection belongs to its own future provider with separate scope and safety controls.
+After a workspace root is approved, the application checks project markers before showing project provider cards. A root without `Cargo.toml`, Gradle root configuration, `pom.xml`, or `package.json` does not show the corresponding provider. A project built exclusively inside Docker can therefore have no Cargo card: host-provider discovery does not claim to inspect Cargo or build cache that exists only inside containers.
+
+## M3.1 Docker awareness
+
+At launch and on **Refresh Docker**, PenguinSpace performs a bounded read-only daemon inspection. If the daemon is available, **Containers & WSL** shows separate cards for images, stopped containers, BuildKit cache, custom networks, and volumes. Each card distinguishes item-count availability from daemon-reported size and reclaimable-size availability. These values describe daemon storage, not project ownership or physical Windows disk reclaim.
+
+Volumes are marked **Stateful** because they may contain persistent data. No M3.1 card has a review, clean, prune, or delete control. If the Docker CLI is missing or the daemon cannot be reached, the surface reports that state without showing stale resource claims. Partial category failures appear as warnings and unavailable values. A future cleanup workflow must not reuse this observation surface as authorization.
+
+Windows acceptance on `out/penguinspace-v0.1.2.exe` confirms both states. With Docker 29.5.3 available, the surface displayed exactly five resource categories and Stateful volumes without cleanup controls. After the operator stopped Rancher Desktop, **Refresh Docker** displayed **Daemon unavailable / Docker resources were not inspected** and removed the previous cards. Rancher remains stopped; request that the operator restart it before the next Docker runtime check.
 
 ## Scan-to-clean flow
 

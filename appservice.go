@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/the-khiem7/PenguinSpaceStudio/internal/core"
+	dockerinventory "github.com/the-khiem7/PenguinSpaceStudio/internal/dockerinventory"
 	"github.com/the-khiem7/PenguinSpaceStudio/internal/elevation"
 	"github.com/the-khiem7/PenguinSpaceStudio/internal/history"
 	bunprovider "github.com/the-khiem7/PenguinSpaceStudio/internal/providers/bun"
@@ -31,14 +32,15 @@ type issuedProviderPlan struct {
 }
 
 type AppService struct {
-	orchestrator  *core.Orchestrator
-	history       *history.Store
-	elevation     *elevation.Controller
-	providerMu    sync.Mutex
-	providers     map[string]core.Provider
-	providerOrder []string
-	providerPlans map[string]issuedProviderPlan
-	workspaceRoot string
+	orchestrator    *core.Orchestrator
+	history         *history.Store
+	elevation       *elevation.Controller
+	dockerInspector *dockerinventory.Inspector
+	providerMu      sync.Mutex
+	providers       map[string]core.Provider
+	providerOrder   []string
+	providerPlans   map[string]issuedProviderPlan
+	workspaceRoot   string
 }
 
 func NewAppService() (*AppService, error) {
@@ -54,9 +56,10 @@ func NewAppService() (*AppService, error) {
 
 	elevationStore := elevation.NewStore(filepath.Join(dataDir, "PenguinSpace", "elevation"))
 	return &AppService{
-		orchestrator: core.NewOrchestrator(core.NewFixtureProvider(), store),
-		history:      store,
-		elevation:    elevation.NewController(elevationStore, newElevationLauncher(), 30*time.Second),
+		orchestrator:    core.NewOrchestrator(core.NewFixtureProvider(), store),
+		history:         store,
+		elevation:       elevation.NewController(elevationStore, newElevationLauncher(), 30*time.Second),
+		dockerInspector: dockerinventory.NewSystemInspector(),
 		providers: map[string]core.Provider{
 			bunprovider.ProviderID:        bunprovider.NewSystemProvider(),
 			cargoprovider.ProviderID:      cargoprovider.NewSystemProvider(),
@@ -94,8 +97,8 @@ func (s *AppService) Close() error {
 func (s *AppService) Dashboard() core.Dashboard {
 	return core.Dashboard{
 		ApplicationName: "PenguinSpace",
-		Stage:           "M2 developer-tool providers ready; project cleanup requires an approved workspace root",
-		SafetyMessage:   "The fixture is no-op; real cleanup requires an inspected backend plan and explicit confirmation.",
+		Stage:           "M3.1 read-only Docker awareness; cleanup remains disabled",
+		SafetyMessage:   "Docker resources are observed independently; no prune or volume mutation is available.",
 	}
 }
 
@@ -105,6 +108,12 @@ func (s *AppService) RunFixtureScenario() (core.Scenario, error) {
 
 func (s *AppService) RecentHistory() ([]core.HistoryRecord, error) {
 	return s.history.List(context.Background(), 20)
+}
+
+func (s *AppService) InspectDockerAwareness() core.DockerAwareness {
+	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
+	defer cancel()
+	return s.dockerInspector.Inspect(ctx)
 }
 
 func (s *AppService) SetWorkspaceRoot(path string) (core.WorkspaceRoot, error) {

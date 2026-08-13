@@ -79,6 +79,30 @@ export type ProviderCleanupOutcome = {
 
 export type WorkspaceRoot = { path: string };
 
+export type DockerAwareness = {
+  daemon: {
+    cliAvailable: boolean;
+    available: boolean;
+    executablePath?: string;
+    version?: string;
+    operatingSystem?: string;
+    architecture?: string;
+    message: string;
+  };
+  inspectedAt: string;
+  resources: Array<{
+    kind: string;
+    name: string;
+    count: number;
+    countAvailable: boolean;
+    size: { bytes: number; kind: string };
+    reclaimable: { bytes: number; kind: string };
+    stateful: boolean;
+    boundary: string;
+  }>;
+  warnings: string[] | null;
+};
+
 export const backend = {
   dashboard: () => AppService.Dashboard(),
   runFixtureScenario: (): Promise<Scenario> => AppService.RunFixtureScenario() as Promise<Scenario>,
@@ -86,6 +110,7 @@ export const backend = {
   cancelElevationProbe: (): Promise<ElevationStatus> => AppService.CancelElevationProbe() as Promise<ElevationStatus>,
   elevationStatus: (): Promise<ElevationStatus> => AppService.ElevationStatus() as Promise<ElevationStatus>,
   recentHistory: () => AppService.RecentHistory(),
+  inspectDockerAwareness: (): Promise<DockerAwareness> => AppService.InspectDockerAwareness() as Promise<DockerAwareness>,
   setWorkspaceRoot: (path: string): Promise<WorkspaceRoot> => AppService.SetWorkspaceRoot(path) as Promise<WorkspaceRoot>,
   discoverDeveloperProviders: (): Promise<ProviderAvailability[]> => AppService.DiscoverDeveloperProviders() as Promise<ProviderAvailability[]>,
   inspectDeveloperProvider: (providerId: string): Promise<ProviderInspection> => AppService.InspectDeveloperProvider(providerId) as Promise<ProviderInspection>,
