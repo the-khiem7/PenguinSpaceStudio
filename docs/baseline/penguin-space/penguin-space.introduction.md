@@ -4,7 +4,7 @@ pack: "penguin-space"
 document: "introduction"
 status: "active"
 updated: "2026-08-14"
-code_ref: "HEAD (M4.3 measurement cancellation)"
+code_ref: "1ce9da1 (M4.3 measurement cancellation)"
 ---
 
 # PenguinSpace baseline
@@ -129,7 +129,7 @@ It is not a generic PC cleaner or merely a GUI for cache-clearing commands. Its 
 
 ## Save checkpoint — M4.3 measurement cancellation
 
-**Code reference:** this M4.3 cancellation phase commit (the pack is re-pointed to its SHA immediately after the commit).
+**Code reference:** `1ce9da1` (`feat(projects): support cancelling an in-flight measurement`).
 
 - `MeasureProject` accepts an optional cancel signal. Cancelling from another goroutine stops the walk before the next directory descent or within 2,000 entries inside one large listing, and the check runs before the deadline and budget checks so a simultaneous cancel is never misreported as a timeout or a budget exhaustion.
 - A cancelled measurement returns `Cancelled: true` with no error and both `Complete` and `Truncated` false; bytes gathered before the stop are exact, and anything never read stays `unavailable`.

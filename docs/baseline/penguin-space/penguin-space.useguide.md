@@ -4,7 +4,7 @@ pack: "penguin-space"
 document: "useguide"
 status: "draft"
 updated: "2026-08-14"
-code_ref: "HEAD (M4.3 measurement cancellation)"
+code_ref: "1ce9da1 (M4.3 measurement cancellation)"
 ---
 
 # Intended product interaction contract
