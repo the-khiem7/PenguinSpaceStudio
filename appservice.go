@@ -12,6 +12,7 @@ import (
 	dockerinventory "github.com/the-khiem7/PenguinSpaceStudio/internal/dockerinventory"
 	"github.com/the-khiem7/PenguinSpaceStudio/internal/elevation"
 	"github.com/the-khiem7/PenguinSpaceStudio/internal/history"
+	projectinventory "github.com/the-khiem7/PenguinSpaceStudio/internal/projectinventory"
 	bunprovider "github.com/the-khiem7/PenguinSpaceStudio/internal/providers/bun"
 	cargoprovider "github.com/the-khiem7/PenguinSpaceStudio/internal/providers/cargo"
 	"github.com/the-khiem7/PenguinSpaceStudio/internal/providers/common"
@@ -40,6 +41,8 @@ type AppService struct {
 	dockerMu        sync.Mutex
 	dockerRemoval   *dockerinventory.NetworkRemovalController
 	wslInspector    *wslinventory.Inspector
+	projectInspect  *projectinventory.Inspector
+	projectMu       sync.Mutex
 	providerMu      sync.Mutex
 	providers       map[string]core.Provider
 	providerOrder   []string
@@ -65,6 +68,7 @@ func NewAppService() (*AppService, error) {
 		elevation:       elevation.NewController(elevationStore, newElevationLauncher(), 30*time.Second),
 		dockerInspector: dockerinventory.NewSystemInspector(),
 		wslInspector:    wslinventory.NewSystemInspector(),
+		projectInspect:  projectinventory.NewSystemInspector(),
 		providers: map[string]core.Provider{
 			bunprovider.ProviderID:        bunprovider.NewSystemProvider(),
 			cargoprovider.ProviderID:      cargoprovider.NewSystemProvider(),
@@ -102,8 +106,8 @@ func (s *AppService) Close() error {
 func (s *AppService) Dashboard() core.Dashboard {
 	return core.Dashboard{
 		ApplicationName: "PenguinSpace",
-		Stage:           "M3.6 read-only WSL and VHDX discovery",
-		SafetyMessage:   "WSL distributions and backing VHDX size are observation-only; shutdown, mount, optimize, compact, and reclaim actions remain unavailable.",
+		Stage:           "M4.1 read-only project storage discovery",
+		SafetyMessage:   "Project discovery lists marker-backed projects and claimed generated directories below the approved root only; sizes, reclaim estimates, plans, and deletion remain unavailable.",
 	}
 }
 
@@ -133,6 +137,24 @@ func (s *AppService) SetWorkspaceRoot(path string) (core.WorkspaceRoot, error) {
 	s.workspaceRoot = root
 	s.providerMu.Unlock()
 	return core.WorkspaceRoot{Path: root}, nil
+}
+
+// DiscoverProjectStorage performs one bounded, read-only M4.1 discovery pass below the
+// approved workspace root. It measures no bytes, issues no plan, and removes nothing.
+func (s *AppService) DiscoverProjectStorage() (core.ProjectDiscovery, error) {
+	s.providerMu.Lock()
+	root := s.workspaceRoot
+	s.providerMu.Unlock()
+	if root == "" {
+		return core.ProjectDiscovery{}, errors.New("approve a workspace root before discovering project storage")
+	}
+
+	s.projectMu.Lock()
+	defer s.projectMu.Unlock()
+
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	return s.projectInspect.Discover(ctx, root), nil
 }
 
 func (s *AppService) DiscoverDeveloperProviders() []core.ProviderAvailability {

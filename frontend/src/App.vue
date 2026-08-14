@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref } from "vue";
-import { backend, ElevationProbeMode, type DockerAwareness, type DockerNetworkRemovalOutcome, type DockerNetworkRemovalPlan, type DockerScopedResource, type ElevationStatus, type Measurement, type MeasurementKind, type ProviderAvailability, type Scenario, type WSLAwareness } from "./backend";
+import { backend, ElevationProbeMode, type DockerAwareness, type DockerNetworkRemovalOutcome, type DockerNetworkRemovalPlan, type DockerScopedResource, type ElevationStatus, type Measurement, type MeasurementKind, type ProjectDiscovery, type ProjectSkipKind, type ProviderAvailability, type Scenario, type WSLAwareness } from "./backend";
 import ProviderCard from "./components/ProviderCard.vue";
 
 type ProviderDefinition = {
@@ -49,6 +49,9 @@ const dockerNetworkRemoving = ref(false);
 const wslAwareness = ref<WSLAwareness | null>(null);
 const wslLoading = ref(false);
 const wslError = ref("");
+const projectDiscovery = ref<ProjectDiscovery | null>(null);
+const projectLoading = ref(false);
+const projectError = ref("");
 let elevationPoller: ReturnType<typeof setInterval> | undefined;
 
 const reclaimed = computed(() => scenario.value?.verification.reclaimedActual.bytes ?? 0);
@@ -125,6 +128,49 @@ async function refreshDockerAwareness() {
   }
 }
 
+async function refreshProjectDiscovery() {
+  if (!workspaceRoot.value) {
+    projectDiscovery.value = null;
+    projectError.value = "";
+    return;
+  }
+  projectLoading.value = true;
+  projectError.value = "";
+  projectDiscovery.value = null;
+  try {
+    projectDiscovery.value = await backend.discoverProjectStorage();
+  } catch (cause) {
+    projectError.value = `Project discovery failed: ${String(cause)}`;
+  } finally {
+    projectLoading.value = false;
+  }
+}
+
+function projectSkipLabel(kind: ProjectSkipKind) {
+  const labels: Record<ProjectSkipKind, string> = {
+    "reparse-point": "Reparse point, not followed",
+    "excluded-metadata": "Version-control metadata",
+    "unclaimed-generated-name": "Generated name without a claiming marker",
+    "depth-limit": "Depth bound reached",
+    unreadable: "Unreadable",
+  };
+  return labels[kind] ?? kind;
+}
+
+const projectArtifactCount = computed(() =>
+  (projectDiscovery.value?.projects ?? []).reduce((total, project) => total + project.artifacts.length, 0),
+);
+const projectSnapshotAuthoritative = computed(() =>
+  projectDiscovery.value !== null &&
+  projectDiscovery.value.rootApproved &&
+  projectDiscovery.value.complete &&
+  !projectDiscovery.value.truncated,
+);
+const projectSnapshotLabel = computed(() => {
+  if (projectSnapshotAuthoritative.value) return "Snapshot complete";
+  return projectDiscovery.value?.truncated ? "Snapshot truncated" : "Snapshot incomplete";
+});
+
 async function refreshWSLAwareness() {
   wslLoading.value = true;
   wslError.value = "";
@@ -186,7 +232,7 @@ function formatBytes(bytes: number) {
   return `${(bytes / 1024 ** exponent).toLocaleString(undefined, { maximumSignificantDigits: 3 })} ${units[exponent]}`;
 }
 
-function formatWSLMeasurement(measurement: Measurement, expectedKind: MeasurementKind, evidenceAvailable = true) {
+function formatObservedMeasurement(measurement: Measurement, expectedKind: MeasurementKind, evidenceAvailable = true) {
   if (!evidenceAvailable || expectedKind === "unavailable" || measurement.kind !== expectedKind) return "Unavailable";
   return formatBytes(measurement.bytes);
 }
@@ -255,6 +301,7 @@ async function saveWorkspaceRoot() {
     const root = await backend.setWorkspaceRoot(workspaceRootInput.value);
     workspaceRoot.value = root.path;
     await refreshDeveloperProviders();
+    await refreshProjectDiscovery();
   } catch (cause) {
     error.value = `Workspace root was not accepted: ${String(cause)}`;
   } finally {
@@ -529,9 +576,9 @@ function availabilityMessage(providerID: string) {
               </header>
               <div class="wsl-metrics">
                 <span><small>WSL version</small><b>{{ distribution.versionAvailable ? distribution.version : "—" }}</b></span>
-                <span><small>Physical VHDX size</small><b>{{ formatWSLMeasurement(distribution.vhdx.physicalSize, "measured-physical", distribution.vhdx.pathAvailable) }}</b></span>
-                <span><small>Logical usage</small><b>{{ formatWSLMeasurement(distribution.vhdx.logicalUsage, "unavailable") }}</b></span>
-                <span><small>Compactable</small><b>{{ formatWSLMeasurement(distribution.vhdx.compactable, "unavailable") }}</b></span>
+                <span><small>Physical VHDX size</small><b>{{ formatObservedMeasurement(distribution.vhdx.physicalSize, "measured-physical", distribution.vhdx.pathAvailable) }}</b></span>
+                <span><small>Logical usage</small><b>{{ formatObservedMeasurement(distribution.vhdx.logicalUsage, "unavailable") }}</b></span>
+                <span><small>Compactable</small><b>{{ formatObservedMeasurement(distribution.vhdx.compactable, "unavailable") }}</b></span>
               </div>
               <code v-if="distribution.vhdx.path" :title="distribution.vhdx.path">{{ distribution.vhdx.path }}</code>
               <p>{{ distribution.vhdx.message }}</p>
@@ -562,6 +609,80 @@ function availabilityMessage(providerID: string) {
         </div>
         <p class="muted">{{ workspaceRoot ? `Approved: ${workspaceRoot}` : "No workspace root approved." }}</p>
         <p class="muted">{{ workspaceDiscoverySummary }}</p>
+      </section>
+
+      <section id="projects" class="provider-category project-discovery" aria-labelledby="project-discovery-title">
+        <div class="provider-category-heading">
+          <div>
+            <p class="eyebrow">M4.1 · Read-only discovery</p>
+            <h2 id="project-discovery-title">Projects below the approved root</h2>
+            <p class="muted">Projects are listed only from exact marker files, and a generated directory is listed only when a marker in the same project claims it. Sizes, reclaim estimates, plans, and deletion are unavailable in this phase.</p>
+          </div>
+          <button class="secondary" :disabled="projectLoading || !workspaceRoot" @click="refreshProjectDiscovery">{{ projectLoading ? "Discovering…" : "Refresh projects" }}</button>
+        </div>
+        <p v-if="!workspaceRoot" class="empty-state">Approve a workspace root above to discover projects. PenguinSpace never scans an implicit root or the user profile.</p>
+        <p v-else-if="projectError" class="error" role="alert">{{ projectError }}</p>
+        <p v-else-if="projectLoading" class="muted provider-loading">Reading project markers and claimed generated directories…</p>
+        <div v-else-if="projectDiscovery" class="project-status">
+          <article class="panel project-summary" :class="{ available: projectSnapshotAuthoritative }">
+            <div>
+              <span class="status"><i></i>{{ projectSnapshotLabel }}</span>
+              <strong>{{ projectDiscovery.projects.length }} project(s) · {{ projectArtifactCount }} claimed generated director(ies)</strong>
+            </div>
+            <small>{{ projectDiscovery.message }}</small>
+          </article>
+
+          <p v-if="projectDiscovery.projects.length === 0" class="empty-state">{{ projectSnapshotAuthoritative ? "No marker-backed project was found below the approved root." : "No marker-backed project was reported, but this snapshot is incomplete, so the approved root cannot be presented as empty." }}</p>
+          <div v-else class="project-grid">
+            <article v-for="project in projectDiscovery.projects" :key="project.path" class="panel project-card">
+              <header>
+                <div>
+                  <span>{{ project.relativePath === "." ? "approved root" : project.relativePath }}</span>
+                  <h3>{{ project.name }}</h3>
+                </div>
+                <span class="readonly-tag">Observation only</span>
+              </header>
+              <div class="project-tags">
+                <span v-for="ecosystem in project.ecosystems" :key="ecosystem" class="ecosystem-tag">{{ ecosystem }}</span>
+                <code v-for="marker in project.markers" :key="marker">{{ marker }}</code>
+              </div>
+              <p v-if="project.artifacts.length === 0" class="muted">No allow-listed generated directory is claimed by this project's markers.</p>
+              <ul v-else class="artifact-list">
+                <li v-for="artifact in project.artifacts" :key="artifact.path">
+                  <div class="artifact-title">
+                    <strong>{{ artifact.name }}</strong>
+                    <span class="review-tag">{{ artifact.risk }} · {{ artifact.recoveryCost }}</span>
+                  </div>
+                  <div class="artifact-metrics">
+                    <span><small>Storage class</small><b>{{ artifact.storageClass }}</b></span>
+                    <span><small>Claimed by</small><b>{{ artifact.ecosystem }}</b></span>
+                    <span><small>Size</small><b>{{ formatObservedMeasurement(artifact.measured, "unavailable") }}</b></span>
+                  </div>
+                  <small>{{ artifact.boundary }}</small>
+                </li>
+              </ul>
+            </article>
+          </div>
+
+          <details v-if="projectDiscovery.skipped.length" class="project-skipped">
+            <summary>Recorded and not traversed ({{ projectDiscovery.skipped.length }})</summary>
+            <p class="muted">These paths are listed for honesty. A skipped path is never treated as empty, absent, or reclaimable.</p>
+            <ul>
+              <li v-for="skip in projectDiscovery.skipped" :key="`${skip.kind}:${skip.relativePath}`">
+                <strong>{{ skip.relativePath }}</strong>
+                <span>{{ projectSkipLabel(skip.kind) }} — {{ skip.reason }}</span>
+              </li>
+            </ul>
+          </details>
+
+          <article class="panel project-boundary">
+            <strong>No project cleanup path</strong>
+            <p>{{ projectDiscovery.boundary }}</p>
+          </article>
+          <ul v-if="projectDiscovery.warnings?.length" class="docker-warnings">
+            <li v-for="warning in projectDiscovery.warnings" :key="warning">{{ warning }}</li>
+          </ul>
+        </div>
       </section>
 
       <section id="developer-tools" class="provider-category" aria-labelledby="developer-tools-title">

@@ -4,7 +4,7 @@ pack: "penguin-space"
 document: "sourcecode"
 status: "active"
 updated: "2026-08-14"
-code_ref: "HEAD (M3.6 read-only WSL/VHDX discovery)"
+code_ref: "HEAD (M4.1 read-only project discovery)"
 ---
 
 # Architecture and implementation
@@ -116,7 +116,19 @@ The Windows allocation adapter opens the exact candidate with `FILE_READ_ATTRIBU
 
 Tests cover partial registry rejection, exact-case mismatch, permanent two/three-plus ambiguity, duplicate verbose rows, strict CJK/surrogate/BOM/BOM-less decoding, malformed output, raw UTF-16 diagnostics, command prohibition, and allocation-size-versus-EOF behavior. Windows-native tests create a sparse file to prove `AllocationSize < EndOfFile` and a symlink to prove real reparse rejection. Final Compose verification passed 15 methods, 8 enums, 30 models, Vue type-check/build, formatting, vet, all internal tests, and Windows production cross-build; final semantic review found no Critical, High, or Medium issue. Installed-distribution layout and Windows visual behavior remain unverified.
 
-M3.6 is implemented. M4 project storage is the next implementation milestone after its broad scope is refined into fixture-bounded discovery/scanner phases; all WSL/VHDX mutation remains separately unauthorized.
+M3.6 is implemented. All WSL/VHDX mutation remains separately unauthorized.
+
+## M4.1 read-only project discovery
+
+`internal/projectinventory.Inspector` performs one bounded, read-only pass below exactly one workspace root that `common.ValidateWorkspaceRoot` revalidates at inspection time. Its only filesystem seam is a `DirectoryReader` with a single `ReadDir` method, so the package has no create, write, rename, or remove capability; the seam exists so fail-closed branches such as a permission denial are covered deterministically instead of depending on host privileges.
+
+A project exists only where an exact-case marker file was found: `package.json`, `Cargo.toml`, `pyproject.toml`, `pom.xml`, or a Gradle root `settings.gradle`/`settings.gradle.kts`/`build.gradle`/`build.gradle.kts`. A generated directory is reported only when its name is on the fixed allow-list (`node_modules`, `target`, `.venv`, `.next`, `dist`, `build`, `.gradle`, `.turbo`) and one of that name's rules matches an ecosystem detected in the same directory; the rule slice fixes the claiming priority, so `target` resolves to Cargo before Maven and `build` to Gradle before a JavaScript project. Every artifact is `StorageRebuildable` with `RiskReview`, a per-name recovery cost, and a `MeasurementUnavailable` measurement. Nothing in this package measures bytes, estimates reclaim, issues a plan, or removes a path.
+
+Traversal is bounded by fixed depth, directory-count, and project-count limits that `NewInspector` restores whenever a caller passes a non-positive value. Reparse points are recorded and never followed; `.git`, `.hg`, and `.svn` are recorded and never traversed; a claimed artifact is reported without descending into it; and an allow-list name without a claiming marker is recorded as explicitly unclaimed rather than traversed or presented as an artifact. Directory-name boundaries match case-insensitively because Windows volumes are case-insensitive, while marker detection stays exact-case so a mismatch can only claim less. Because a cached parent entry can be stale, the resolved path is re-checked with a no-follow `Lstat` immediately before it is read, so a directory that became a reparse point after the descend decision is skipped instead of escaping the root.
+
+Failures fail closed. A read or revalidation error records the path, emits a warning, and clears `Complete`; an exhausted depth, directory, project, or recorded-skip bound sets `Truncated` and clears `Complete`; a cancelled context stops the pass with a warning. The summary counts only directories that were actually read, so an omission is never presented as absence.
+
+`AppService.DiscoverProjectStorage` serializes discovery under its own mutex, requires an approved root, and applies a 30-second context. The Vue **Projects** surface renders projects, markers, ecosystems, claimed artifacts with **Unavailable** sizes, and the recorded skip list. Its status badge is authoritative only when the snapshot is approved, complete, and untruncated, and its zero-project message refuses to describe an incomplete snapshot as an empty root. No inspect, review, confirm, plan, or delete control exists on this surface.
 
 ## Required core models
 

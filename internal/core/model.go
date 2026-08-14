@@ -25,7 +25,8 @@ const (
 type StorageClass string
 
 const (
-	StorageDisposable StorageClass = "Disposable cache"
+	StorageDisposable  StorageClass = "Disposable cache"
+	StorageRebuildable StorageClass = "Rebuildable artifact"
 )
 
 type MeasurementKind string
@@ -300,6 +301,66 @@ type WSLAwareness struct {
 	Distributions  []WSLDistribution `json:"distributions"`
 	Warnings       []string          `json:"warnings"`
 	Message        string            `json:"message"`
+}
+
+type ProjectEcosystem string
+
+const (
+	EcosystemNode   ProjectEcosystem = "node"
+	EcosystemRust   ProjectEcosystem = "rust"
+	EcosystemPython ProjectEcosystem = "python"
+	EcosystemGradle ProjectEcosystem = "gradle"
+	EcosystemMaven  ProjectEcosystem = "maven"
+)
+
+type ProjectSkipKind string
+
+const (
+	ProjectSkipReparsePoint     ProjectSkipKind = "reparse-point"
+	ProjectSkipExcludedMetadata ProjectSkipKind = "excluded-metadata"
+	ProjectSkipUnclaimedName    ProjectSkipKind = "unclaimed-generated-name"
+	ProjectSkipDepthLimit       ProjectSkipKind = "depth-limit"
+	ProjectSkipUnreadable       ProjectSkipKind = "unreadable"
+)
+
+type ProjectArtifactObservation struct {
+	Name         string           `json:"name"`
+	Path         string           `json:"path"`
+	RelativePath string           `json:"relativePath"`
+	Ecosystem    ProjectEcosystem `json:"ecosystem"`
+	StorageClass StorageClass     `json:"storageClass"`
+	Risk         RiskLevel        `json:"risk"`
+	RecoveryCost RecoveryCost     `json:"recoveryCost"`
+	Measured     Measurement      `json:"measured"`
+	Boundary     string           `json:"boundary"`
+}
+
+type ProjectObservation struct {
+	Name         string                       `json:"name"`
+	Path         string                       `json:"path"`
+	RelativePath string                       `json:"relativePath"`
+	Ecosystems   []ProjectEcosystem           `json:"ecosystems"`
+	Markers      []string                     `json:"markers"`
+	Artifacts    []ProjectArtifactObservation `json:"artifacts"`
+}
+
+type ProjectSkippedPath struct {
+	RelativePath string          `json:"relativePath"`
+	Kind         ProjectSkipKind `json:"kind"`
+	Reason       string          `json:"reason"`
+}
+
+type ProjectDiscovery struct {
+	Root         string               `json:"root"`
+	RootApproved bool                 `json:"rootApproved"`
+	InspectedAt  time.Time            `json:"inspectedAt"`
+	Complete     bool                 `json:"complete"`
+	Truncated    bool                 `json:"truncated"`
+	Projects     []ProjectObservation `json:"projects"`
+	Skipped      []ProjectSkippedPath `json:"skipped"`
+	Warnings     []string             `json:"warnings"`
+	Message      string               `json:"message"`
+	Boundary     string               `json:"boundary"`
 }
 
 type Dashboard struct {

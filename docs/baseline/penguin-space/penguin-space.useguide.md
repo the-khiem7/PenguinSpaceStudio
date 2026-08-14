@@ -4,7 +4,7 @@ pack: "penguin-space"
 document: "useguide"
 status: "draft"
 updated: "2026-08-14"
-code_ref: "HEAD (M3.6 read-only WSL/VHDX discovery)"
+code_ref: "HEAD (M4.1 read-only project discovery)"
 ---
 
 # Intended product interaction contract
@@ -60,6 +60,14 @@ Only a verified exact-ID absence is a successful network removal. No byte reclai
 A physical VHDX size appears only for an exact, unambiguous WSL 2 identity whose paired current-user registration supplies an absolute base path and whose exact `ext4.vhdx` can be opened as a regular non-reparse file. The displayed value is allocated Windows host bytes, not logical EOF. **Logical usage** and **Compactable** remain **Unavailable** in M3.6. A path or unknown/mismatched measurement kind cannot make the UI display bytes.
 
 The surface is marked **Observation only** and has no action beyond refresh. It cannot start or stop a distribution, run Linux `df`, launch elevation, mount/unmount a disk, change sparse mode, optimize, compact, import/export, unregister, or claim reclaimed storage. Windows-native sparse and reparse fixtures plus the full Docker gate verify implementation behavior; installed-distribution layout and visual acceptance remain open, so the UI must not describe them as runtime-confirmed.
+
+## M4.1 read-only project discovery
+
+**Projects** appears only after a workspace root has been approved; without one, the surface states that PenguinSpace never scans an implicit root or the user profile. **Refresh projects** runs one bounded backend pass and returns observations only.
+
+A project card is rendered only when an exact marker file was found in that directory, and it lists the markers plus the ecosystems they prove. A generated directory is listed only when its allow-list name is claimed by a marker in the same project; every artifact shows storage class, risk, recovery cost, its claiming ecosystem, and a **Size** of **Unavailable**. There is no Inspect, Review, Confirm, Clean, or delete control on this surface in M4.1.
+
+The status badge reads **Snapshot complete** only when the root was approved, no read failed, and no bound was reached; otherwise it reads **Snapshot truncated** or **Snapshot incomplete**, and the zero-project message explicitly refuses to present the root as empty. A collapsed **Recorded and not traversed** list shows every skipped path with its reason: a reparse point that was never followed, version-control metadata, an allow-list name without a claiming marker, the depth bound, or an unreadable directory.
 
 ## Scan-to-clean flow
 

@@ -4,7 +4,7 @@ pack: "penguin-space"
 document: "introduction"
 status: "active"
 updated: "2026-08-14"
-code_ref: "HEAD (M3.6 read-only WSL/VHDX discovery)"
+code_ref: "HEAD (M4.1 read-only project discovery)"
 ---
 
 # PenguinSpace baseline
@@ -41,6 +41,7 @@ It is not a generic PC cleaner or merely a GUI for cache-clearing commands. Its 
 - The M1 elevation probe is committed in `6ee788d`: it has a fixed action allow-list, per-operation Windows `runas` launcher, cancellation and timeout states, and a UI control. Docker verification, Windows cross-build, and a hidden process-start smoke test passed. On 2026-08-11 the user exercised the visible UI and observed the no-op probe reach `Succeeded`; it still has no cleanup provider or arbitrary shell-command channel.
 - The root `PROPOSAL.md`, which was an already staged newly added file, was removed after byte-identical preservation in this pack.
 - Product decisions are approved direction, not runtime proof. Implemented evidence includes the M1 fixture/elevation, all bounded M2 provider slices, M3.3 read-only Docker ownership presentation, M3.5 exact Compose custom-network removal, and M3.6 read-only WSL/VHDX discovery. M3.6 requires complete exact registration identity plus affirmative WSL 2 evidence and reports only handle allocation bytes as physical measurement; logical usage and compactability remain unavailable. Images, containers, BuildKit, volumes, blanket prune, WSL/VHDX mutation, packaging, and release behaviour remain blocked or planned as recorded in the roadmap.
+- M4 is refined into four fixture-bounded phases and M4.1 read-only project discovery is implemented and Docker-verified; project measurement, reclaim estimates, last-used heuristics, and every project-artifact deletion remain unauthorized.
 - Docker-only verification and Windows cross-build pass through Compose. The generated Windows executable launched successfully for five seconds on the host in a hidden smoke test, then was stopped; this is process-start evidence, not interactive UI acceptance.
 - The fixture lifecycle scans, plans, requires confirmation, executes only an in-memory change, verifies exact reclaimed bytes, and persists a history record. It is not an implementation of any real cleanup provider or command.
 - Commit `d0bc468` upgrades the no-op elevation request to contract version 2 and activates its bounded 30-second execution window only after the Windows launcher returns successfully. The helper waits for that activation, so operator consent time no longer consumes execution time; repeated regression tests cover slow consent, timeout after consent, refusal mapping, cancellation, and allow-list validation. Docker `verify` and `build` passed and produced `out/penguinspace.exe` (13,556,736 bytes; SHA-256 `f606c7a33c6ee13856db965cea2193c2e43197018fee30b6bbf078921125c4f1`). On the Windows host with UAC set to Never notify, the rebuilt executable reached `Succeeded`, `Cancelled`, and `Timed-Out`; its visible fixture lifecycle completed 3.00 MiB through scan, plan, backend confirmation, no-filesystem execution, and verification. Interactive refusal remains unverified because this host configuration auto-approves `runas` without presenting a rejectable prompt.
@@ -71,7 +72,7 @@ It is not a generic PC cleaner or merely a GUI for cache-clearing commands. Its 
 
 ## Save checkpoint — M3.3 read-only ownership presentation
 
-**Code reference:** this M3.3 phase commit.
+**Code reference:** `3141ad4` (`feat(docker): present read-only ownership scope`); Windows acceptance recorded in `f499785`.
 
 - `DockerAwareness` now keeps daemon-wide totals separate from ID-backed ownership observations. Exact valid `com.docker.compose.project` labels form project groups; absent, malformed, or resource-type-conflicting canonical labels remain in an explicit `unscoped` group without name/tag/path inference.
 - Images expose current all-container reference counts; stopped containers expose image ID plus network and mount counts; custom networks expose attachment counts; volumes expose mount counts and remain Stateful/Danger even at zero. Every relationship count has an availability flag, and a partial list/inspect result marks the ownership snapshot incomplete rather than silently converting missing data to zero or unscoped.
@@ -83,7 +84,7 @@ It is not a generic PC cleaner or merely a GUI for cache-clearing commands. Its 
 
 ## Save checkpoint — M3.5 exact Compose network removal
 
-**Code reference:** this M3.5 phase commit.
+**Code reference:** `e90ceda` (`feat(docker): implement exact Compose network removal with M3.5 checkpoint`).
 
 - One controller-owned plan may target one exact custom-network ID selected from a fresh, complete ownership snapshot. Eligibility requires canonical Compose project/network labels and exactly one available zero-attachment observation; missing rows, duplicate/unexpected inspect identities, absent/null attachment metadata, changed labels, or new attachments fail closed.
 - Execution accepts only the retained plan ID plus explicit confirmation, immediately re-inspects the exact network, and can invoke only `docker network rm <ID>` without force. Independent exact-ID reconciliation handles success, verification failure, and daemon-side mutation followed by a CLI error. The outcome preserves command-attempt/completion, verified absence, refreshed awareness, history status, and any follow-up failure; reclaimed bytes are always `unavailable`.
@@ -94,13 +95,24 @@ It is not a generic PC cleaner or merely a GUI for cache-clearing commands. Its 
 
 ## Save checkpoint — M3.6 read-only WSL/VHDX discovery
 
-**Code reference:** this M3.6 phase commit.
+**Code reference:** `339f67f` (`feat(wsl): add read-only VHDX awareness with M3.6 checkpoint`).
 
 - `internal/wslinventory` performs three fixed list-only WSL calls and correlates exact CLI identities with complete current-user registration metadata. Any registry read error, duplicate identity, case mismatch, malformed encoding, missing affirmative WSL 2 version, or unsafe path disables VHDX measurement.
 - On Windows, the candidate is opened without following a reparse point. Handle attributes reject reparse points/directories, and `FILE_STANDARD_INFO.AllocationSize` supplies the only physical-byte claim; EOF, distro logical usage, compactability, and reclaimable bytes remain unavailable.
 - The Containers & WSL surface is observation-only. It displays a physical size only when path evidence is available and the measurement kind is exactly `measured-physical`; mismatched or unavailable measurements display **Unavailable**. There is no WSL or VHDX action control.
 - Windows-native sparse-allocation and reparse tests passed. The final Docker gate passed 15 service methods, 8 enums, 30 models, Vue type-check/build, formatting, vet, internal tests, and Windows production cross-build. Final semantic review found no Critical, High, or Medium issue.
 - No installed distribution or VHDX was mutated. Live installed-WSL layout/access and Windows visual behavior remain unverified; M4 project-storage phase refinement is the next implementation action.
+
+## Save checkpoint — M4.1 read-only project discovery
+
+**Code reference:** this M4.1 phase commit (working tree at the time of writing; the pack must be re-pointed to its SHA after the commit).
+
+- M4 is refined into four fixture-bounded phases: M4.1 read-only discovery, M4.2 exact logical measurement with exclusions, M4.3 project detail plus a last-used heuristic decision, and M4.4 one reviewed exact artifact removal. A phase is authorized only by the recorded acceptance of the phase before it.
+- `internal/projectinventory` implements M4.1. Projects come only from exact marker files, and a generated directory is reported only when its allow-list name is claimed by a marker in the same directory. Every measurement is `unavailable`; there is no plan, confirmation, executor, estimate, or deletion path.
+- Traversal is depth-, directory-, project-, and skip-bounded, never follows a reparse point, never traverses `.git`/`.hg`/`.svn`, never descends into a claimed artifact or an unclaimed allow-list name, and re-checks the resolved path with a no-follow `Lstat` before reading it. Read failures and exhausted bounds clear completeness instead of presenting a shorter list as authoritative.
+- The Vue **Projects** surface is observation-only: **Unavailable** sizes, a recorded skip list with reasons, an authoritative badge only for an approved, complete, untruncated snapshot, and no cleanup control.
+- `docker compose run --rm verify` passed binding generation (16 methods, 10 enums, 34 models), Vue type-check/build, gofmt, vet, all internal tests, and the Windows production cross-build. The `projectinventory` fixtures cover nested projects, claiming priority, unclaimed and differently cased allow-list names, VCS metadata, reparse rejection including read-time revalidation, depth/directory/project/skip bounds, cancellation, an injected permission denial, and root validation; they passed repeated runs with no skipped test.
+- No project file or directory was created, modified, or removed by discovery. Windows visual acceptance of the Projects surface remains open, and M4.2 measurement is not authorized by this checkpoint.
 
 ## Storage model
 

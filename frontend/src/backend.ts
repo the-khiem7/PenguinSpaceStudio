@@ -165,6 +165,49 @@ export type DockerNetworkRemovalOutcome = {
   awareness: DockerAwareness;
 };
 
+export type ProjectEcosystem = "node" | "rust" | "python" | "gradle" | "maven";
+
+export type ProjectSkipKind =
+  | "reparse-point"
+  | "excluded-metadata"
+  | "unclaimed-generated-name"
+  | "depth-limit"
+  | "unreadable";
+
+export type ProjectArtifactObservation = {
+  name: string;
+  path: string;
+  relativePath: string;
+  ecosystem: ProjectEcosystem;
+  storageClass: string;
+  risk: string;
+  recoveryCost: string;
+  measured: Measurement;
+  boundary: string;
+};
+
+export type ProjectObservation = {
+  name: string;
+  path: string;
+  relativePath: string;
+  ecosystems: ProjectEcosystem[];
+  markers: string[];
+  artifacts: ProjectArtifactObservation[];
+};
+
+export type ProjectDiscovery = {
+  root: string;
+  rootApproved: boolean;
+  inspectedAt: string;
+  complete: boolean;
+  truncated: boolean;
+  projects: ProjectObservation[];
+  skipped: Array<{ relativePath: string; kind: ProjectSkipKind; reason: string }>;
+  warnings: string[] | null;
+  message: string;
+  boundary: string;
+};
+
 export type WSLAwareness = {
   cliAvailable: boolean;
   available: boolean;
@@ -201,6 +244,7 @@ export const backend = {
   executeDockerNetworkRemoval: (planId: string): Promise<DockerNetworkRemovalOutcome> => AppService.ExecuteDockerNetworkRemoval(planId, true) as Promise<DockerNetworkRemovalOutcome>,
   setWorkspaceRoot: (path: string): Promise<WorkspaceRoot> => AppService.SetWorkspaceRoot(path) as Promise<WorkspaceRoot>,
   discoverDeveloperProviders: (): Promise<ProviderAvailability[]> => AppService.DiscoverDeveloperProviders() as Promise<ProviderAvailability[]>,
+  discoverProjectStorage: (): Promise<ProjectDiscovery> => AppService.DiscoverProjectStorage() as Promise<ProjectDiscovery>,
   inspectDeveloperProvider: (providerId: string): Promise<ProviderInspection> => AppService.InspectDeveloperProvider(providerId) as Promise<ProviderInspection>,
   executeDeveloperProvider: (providerId: string): Promise<ProviderCleanupOutcome> => AppService.ExecuteDeveloperProvider(providerId, true) as Promise<ProviderCleanupOutcome>,
 };
