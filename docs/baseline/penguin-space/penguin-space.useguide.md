@@ -4,7 +4,7 @@ pack: "penguin-space"
 document: "useguide"
 status: "draft"
 updated: "2026-08-14"
-code_ref: "HEAD (M4.4 reviewed exact artifact removal)"
+code_ref: "33529ce (M4.4 reviewed exact artifact removal)"
 ---
 
 # Intended product interaction contract
