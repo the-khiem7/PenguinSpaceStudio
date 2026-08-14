@@ -58,6 +58,28 @@ code_ref: "1ce9da1 (M4.3 measurement cancellation)"
 
 **Follow-on:** M3.3 implements and Windows-validates only these read-only grouping and relationship fields, including fail-closed incomplete-snapshot handling. M3.4 authorizes M3.5 to remove only one exact, revalidated, empty Compose custom network with explicit Review confirmation and post-removal verification. Images, containers, BuildKit, volumes, broad prune, and multi-target removal remain blocked. M3.6 is read-only WSL/VHDX discovery only.
 
+## M4.3 last-used heuristic decision (2026-08-14)
+
+**Scope:** this closes only which project-detail time signal, if any, PenguinSpace may display for a claimed artifact. It authorizes no ranking, preselection, or "abandoned" classification, and no filesystem traversal beyond what discovery and measurement already perform.
+
+**Evidence reviewed:**
+
+- Since Windows Vista, NTFS disables last-access-time updates by default (`NtfsDisableLastAccessUpdate`); the modern default registry value defers to that same disabled system behavior. Opening, reading, or listing a file is not guaranteed to change `LastAccessTime` on a real user machine, and re-enabling it requires an elevated registry change plus a reboot that PenguinSpace does not and must not perform. [Source, paraphrased for licensing compliance](https://learn.microsoft.com/en-my/answers/questions/5872049/ntfs-last-access-timestamp-discrepancies-in-fsrm-archiving-workflows), [Source](https://superuser.com/questions/1408920/what-does-a-disablelastaccess-value-of-3-mean).
+- A directory's `LastWriteTime` (mtime) changes only when an entry is added, removed, or renamed inside it, not when its contents are read or executed. A `node_modules` directory used daily by a build but not reinstalled for months reports the same mtime as an abandoned one; presenting that value as "last used" actively misleads toward deleting artifacts still in active use.
+- A per-file max-mtime scan across an artifact would require the same recursive cost already separated into M4.2 measurement, so it cannot be produced for free during discovery.
+
+**Decision:**
+
+| Question | Decision | What remains blocked |
+|---|---|---|
+| Is access time (atime) ever shown? | No. It is not verifiably reliable on a real Windows host without a system-wide, rebooted registry change PenguinSpace does not control. | Any atime-based signal, any heuristic that assumes atime updates, and any attempt to detect or change the `NtfsDisableLastAccessUpdate` setting. |
+| Is there a "last used" field? | No. The concept is renamed and scoped down to **Last modified**, defined only as the artifact root directory's own `LastWriteTime`, obtained from the `Lstat` already performed during discovery/measurement with no additional traversal. | Any field, label, or tooltip that calls this value "last used," "last accessed," or "activity." |
+| What must the UI disclose? | The exact sentence "Last modified reflects when this directory's contents last changed, not when it was last read or used" (or an equivalent no-narrower statement) must accompany the value. | Presenting the bare timestamp without that disclosure. |
+| Can this value influence sorting, ranking, badges, or defaults? | No. It is presentation-only, identical in authority to any other observation field. | Sorting projects/artifacts by this value, marking anything "stale" or "abandoned," pre-selecting anything based on it, and any use of it in a future cleanup plan. |
+| What is deferred? | A tool-log-derived usage signal (for example package-manager install history) and an in-app "last inspected by PenguinSpace" signal are both possible future work, each requiring its own provider-specific or product research. | Implementing either without a separate decision record, and conflating either with filesystem-derived "last modified." |
+
+**Rejected alternatives:** displaying atime when available (rejected: unverifiable and silently wrong on the common disabled-by-default case); a recursive max-mtime scan across artifact contents (rejected: reintroduces the traversal cost M4.2 already isolated, for a value that is still modification, not usage, semantics).
+
 ## M4 project-storage boundary decision record
 
 **Scope:** this record closes only how M4 is sequenced and what M4.1 may observe. It closes no cleanup semantics for any project artifact.

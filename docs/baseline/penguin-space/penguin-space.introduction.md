@@ -136,7 +136,17 @@ It is not a generic PC cleaner or merely a GUI for cache-clearing commands. Its 
 - `AppService` serializes measurement and tracks the active cancel signal under a separate mutex so `CancelProjectMeasurement` never blocks on the in-flight call and never reaches a stale signal from a just-finished measurement.
 - Vue adds **Cancel measurement** beside the measure control and a distinct **Cancelled, partial** label.
 - `docker compose run --rm verify` passed bindings (18 methods, 10 enums, 37 models), Vue type-check/build, gofmt, vet, and all internal tests; cancellation fixtures passed under `-race`. A semantic review reported no High or Critical issue; its Medium tie-break findings and Low dead-code findings were fixed before this checkpoint.
-- Project detail and the last-used heuristic decision remain open for M4.3. No filesystem path was created, modified, or removed, and this change has not been exercised through the Windows UI.
+- Project detail remains open for M4.3. No filesystem path was created, modified, or removed, and this change has not been exercised through the Windows UI.
+
+## Save checkpoint — M4.3 last-used heuristic decision
+
+**Code reference:** `eddf959` (no code changed by this decision; documentation only).
+
+- Access time is never shown. NTFS disables last-access-time updates by default since Windows Vista, and re-enabling it needs an elevated, rebooted registry change PenguinSpace does not perform, so atime cannot be trusted on a real host.
+- The "last used" concept is renamed to **Last modified** and scoped to the artifact root directory's own modification time only, already available from the `Lstat` performed during discovery/measurement; no additional traversal is added. A max-mtime scan across artifact contents was rejected because it reintroduces the recursive cost M4.2 already separated out, for a value that would still mean modification, not usage.
+- The value must always be shown with a disclosure that it reflects modification, not reading or use, and it must never drive sorting, ranking, "abandoned" labeling, preselection, or any cleanup plan.
+- A tool-log-derived usage signal and an in-app "last inspected" signal are explicitly deferred, each pending its own decision record.
+- This is a documentation-only decision; no code changed. Project detail implementation, which will consume this decision, remains open for M4.3.
 
 ## Storage model
 
