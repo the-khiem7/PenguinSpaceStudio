@@ -172,7 +172,11 @@ export type ProjectSkipKind =
   | "excluded-metadata"
   | "unclaimed-generated-name"
   | "depth-limit"
-  | "unreadable";
+  | "unreadable"
+  | "excluded-by-rule"
+  | "non-regular";
+
+export type ProjectSkippedPath = { relativePath: string; kind: ProjectSkipKind; reason: string };
 
 export type ProjectArtifactObservation = {
   name: string;
@@ -202,7 +206,44 @@ export type ProjectDiscovery = {
   complete: boolean;
   truncated: boolean;
   projects: ProjectObservation[];
-  skipped: Array<{ relativePath: string; kind: ProjectSkipKind; reason: string }>;
+  skipped: ProjectSkippedPath[];
+  warnings: string[] | null;
+  message: string;
+  boundary: string;
+};
+
+export type ProjectExclusionRule = { rule: string; relativePath: string; matched: boolean };
+
+export type ProjectArtifactMeasurement = {
+  name: string;
+  path: string;
+  relativePath: string;
+  ecosystem: ProjectEcosystem;
+  storageClass: string;
+  risk: string;
+  recoveryCost: string;
+  measured: Measurement;
+  reclaimable: Measurement;
+  files: number;
+  directories: number;
+  complete: boolean;
+  truncated: boolean;
+  skipped: ProjectSkippedPath[];
+  boundary: string;
+};
+
+export type ProjectMeasurement = {
+  name: string;
+  path: string;
+  relativePath: string;
+  root: string;
+  measuredAt: string;
+  artifacts: ProjectArtifactMeasurement[];
+  total: Measurement;
+  reclaimable: Measurement;
+  complete: boolean;
+  truncated: boolean;
+  exclusions: ProjectExclusionRule[];
   warnings: string[] | null;
   message: string;
   boundary: string;
@@ -245,6 +286,8 @@ export const backend = {
   setWorkspaceRoot: (path: string): Promise<WorkspaceRoot> => AppService.SetWorkspaceRoot(path) as Promise<WorkspaceRoot>,
   discoverDeveloperProviders: (): Promise<ProviderAvailability[]> => AppService.DiscoverDeveloperProviders() as Promise<ProviderAvailability[]>,
   discoverProjectStorage: (): Promise<ProjectDiscovery> => AppService.DiscoverProjectStorage() as Promise<ProjectDiscovery>,
+  measureProjectStorage: (projectPath: string, exclusions: string[]): Promise<ProjectMeasurement> =>
+    AppService.MeasureProjectStorage(projectPath, exclusions) as Promise<ProjectMeasurement>,
   inspectDeveloperProvider: (providerId: string): Promise<ProviderInspection> => AppService.InspectDeveloperProvider(providerId) as Promise<ProviderInspection>,
   executeDeveloperProvider: (providerId: string): Promise<ProviderCleanupOutcome> => AppService.ExecuteDeveloperProvider(providerId, true) as Promise<ProviderCleanupOutcome>,
 };

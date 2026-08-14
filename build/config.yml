@@ -6,7 +6,7 @@ info:
   productIdentifier: "io.github.the-khiem7.penguinspace"
   description: "Windows-first developer storage manager"
   copyright: "Copyright PenguinSpace contributors"
-  version: "0.1.4"
+  version: "0.1.5"
 
 dev_mode:
   root_path: .

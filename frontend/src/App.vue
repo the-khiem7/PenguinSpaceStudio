@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref } from "vue";
-import { backend, ElevationProbeMode, type DockerAwareness, type DockerNetworkRemovalOutcome, type DockerNetworkRemovalPlan, type DockerScopedResource, type ElevationStatus, type Measurement, type MeasurementKind, type ProjectDiscovery, type ProjectSkipKind, type ProviderAvailability, type Scenario, type WSLAwareness } from "./backend";
+import { backend, ElevationProbeMode, type DockerAwareness, type DockerNetworkRemovalOutcome, type DockerNetworkRemovalPlan, type DockerScopedResource, type ElevationStatus, type Measurement, type MeasurementKind, type ProjectDiscovery, type ProjectMeasurement, type ProjectSkipKind, type ProjectSkippedPath, type ProviderAvailability, type Scenario, type WSLAwareness } from "./backend";
 import ProviderCard from "./components/ProviderCard.vue";
 
 type ProviderDefinition = {
@@ -52,6 +52,10 @@ const wslError = ref("");
 const projectDiscovery = ref<ProjectDiscovery | null>(null);
 const projectLoading = ref(false);
 const projectError = ref("");
+const projectExclusionInput = ref("");
+const projectMeasurement = ref<ProjectMeasurement | null>(null);
+const projectMeasuringPath = ref("");
+const projectMeasureError = ref("");
 let elevationPoller: ReturnType<typeof setInterval> | undefined;
 
 const reclaimed = computed(() => scenario.value?.verification.reclaimedActual.bytes ?? 0);
@@ -137,6 +141,8 @@ async function refreshProjectDiscovery() {
   projectLoading.value = true;
   projectError.value = "";
   projectDiscovery.value = null;
+  projectMeasurement.value = null;
+  projectMeasureError.value = "";
   try {
     projectDiscovery.value = await backend.discoverProjectStorage();
   } catch (cause) {
@@ -153,8 +159,56 @@ function projectSkipLabel(kind: ProjectSkipKind) {
     "unclaimed-generated-name": "Generated name without a claiming marker",
     "depth-limit": "Depth bound reached",
     unreadable: "Unreadable",
+    "excluded-by-rule": "Excluded by rule",
+    "non-regular": "Not a regular file",
   };
   return labels[kind] ?? kind;
+}
+
+const projectExclusions = computed(() =>
+  projectExclusionInput.value
+    .split("\n")
+    .map((entry) => entry.trim())
+    .filter((entry) => entry.length > 0),
+);
+const projectMeasurementAuthoritative = computed(() =>
+  projectMeasurement.value !== null && projectMeasurement.value.complete && !projectMeasurement.value.truncated,
+);
+
+async function measureProject(projectPath: string) {
+  projectMeasuringPath.value = projectPath;
+  projectMeasureError.value = "";
+  projectMeasurement.value = null;
+  try {
+    projectMeasurement.value = await backend.measureProjectStorage(projectPath, projectExclusions.value);
+  } catch (cause) {
+    projectMeasureError.value = `Project measurement failed: ${String(cause)}`;
+  } finally {
+    projectMeasuringPath.value = "";
+  }
+}
+
+function measuredValue(measurement: Measurement) {
+  return measurement.kind === "measured-logical" ? formatBytes(measurement.bytes) : "Unavailable";
+}
+
+// A count is described by why it is not authoritative, so a deliberate exclusion is
+// never presented as the same thing as a failed read or an exhausted budget.
+function countLabel(scope: { complete: boolean; truncated: boolean; skipped?: ProjectSkippedPath[] }) {
+  if (scope.truncated) return "Partial count";
+  if (scope.complete) return "Full count";
+  const skipped = scope.skipped ?? [];
+  if (skipped.some((skip) => skip.kind !== "excluded-by-rule")) return "Incomplete count";
+  if (skipped.some((skip) => skip.kind === "excluded-by-rule")) return "Excluded scope";
+  return "Incomplete count";
+}
+
+function projectCountLabel(measurement: ProjectMeasurement) {
+  return countLabel({
+    complete: measurement.complete,
+    truncated: measurement.truncated,
+    skipped: measurement.artifacts.flatMap((artifact) => artifact.skipped),
+  });
 }
 
 const projectArtifactCount = computed(() =>
@@ -224,7 +278,8 @@ async function executeDockerNetworkRemoval() {
   }
 }
 
-function formatBytes(bytes: number) {
+function formatBytes(bytes: number, kind?: string) {
+  if (kind !== undefined && kind !== "measured-logical" && kind !== "estimated-logical" && kind !== "measured-physical") return "Unavailable";
   if (!Number.isFinite(bytes) || bytes < 0) return "Unavailable";
   if (bytes === 0) return "0 B";
   const units = ["B", "KiB", "MiB", "GiB", "TiB"];
@@ -614,11 +669,11 @@ function availabilityMessage(providerID: string) {
       <section id="projects" class="provider-category project-discovery" aria-labelledby="project-discovery-title">
         <div class="provider-category-heading">
           <div>
-            <p class="eyebrow">M4.1 · Read-only discovery</p>
+            <p class="eyebrow">M4.1 discovery · M4.2 measurement</p>
             <h2 id="project-discovery-title">Projects below the approved root</h2>
-            <p class="muted">Projects are listed only from exact marker files, and a generated directory is listed only when a marker in the same project claims it. Sizes, reclaim estimates, plans, and deletion are unavailable in this phase.</p>
+            <p class="muted">Projects are listed only from exact marker files, and a generated directory is listed only when a marker in the same project claims it. Measuring reports exact logical bytes, never physical reclaim; reclaim estimates, plans, and deletion stay unavailable.</p>
           </div>
-          <button class="secondary" :disabled="projectLoading || !workspaceRoot" @click="refreshProjectDiscovery">{{ projectLoading ? "Discovering…" : "Refresh projects" }}</button>
+          <button class="secondary" :disabled="projectLoading || !workspaceRoot || Boolean(projectMeasuringPath)" @click="refreshProjectDiscovery">{{ projectLoading ? "Discovering…" : "Refresh projects" }}</button>
         </div>
         <p v-if="!workspaceRoot" class="empty-state">Approve a workspace root above to discover projects. PenguinSpace never scans an implicit root or the user profile.</p>
         <p v-else-if="projectError" class="error" role="alert">{{ projectError }}</p>
@@ -647,7 +702,13 @@ function availabilityMessage(providerID: string) {
                 <code v-for="marker in project.markers" :key="marker">{{ marker }}</code>
               </div>
               <p v-if="project.artifacts.length === 0" class="muted">No allow-listed generated directory is claimed by this project's markers.</p>
-              <ul v-else class="artifact-list">
+              <button
+                v-else
+                class="secondary project-measure-button"
+                :disabled="Boolean(projectMeasuringPath) || projectLoading"
+                @click="measureProject(project.path)"
+              >{{ projectMeasuringPath === project.path ? "Measuring…" : "Measure logical bytes" }}</button>
+              <ul v-if="project.artifacts.length" class="artifact-list">
                 <li v-for="artifact in project.artifacts" :key="artifact.path">
                   <div class="artifact-title">
                     <strong>{{ artifact.name }}</strong>
@@ -663,6 +724,73 @@ function availabilityMessage(providerID: string) {
               </ul>
             </article>
           </div>
+
+          <section class="panel measurement-scope" aria-labelledby="measurement-scope-title">
+            <div class="docker-subsection-heading">
+              <div>
+                <p class="eyebrow">M4.2 · Measurement scope</p>
+                <h3 id="measurement-scope-title">Exclusions for the next measurement</h3>
+              </div>
+              <span class="readonly-tag">Not persisted</span>
+            </div>
+            <p class="muted">One path per line, resolved against the <strong>approved root</strong>, not against the selected project. The backend validates every rule, rejects patterns, anything outside the root, and any path through a reparse point, then reports each rule with the result. An exclusion only removes bytes from the count; it can never re-include a path that a safety rule rejected.</p>
+            <textarea
+              v-model="projectExclusionInput"
+              aria-label="Exclusion paths, one per line"
+              placeholder="node_modules/.cache&#10;dist/reports"
+              rows="3"
+            ></textarea>
+            <p class="muted">{{ projectExclusions.length === 0 ? "No exclusion is applied; measurement will count every readable regular file." : `${projectExclusions.length} exclusion(s) will be sent with the next measurement.` }}</p>
+          </section>
+
+          <p v-if="projectMeasureError" class="error" role="alert">{{ projectMeasureError }}</p>
+
+          <p v-if="projectMeasuringPath" class="muted provider-loading" role="status" aria-live="polite">Counting exact logical bytes; this can take a while on a large dependency tree.</p>
+
+          <section v-if="projectMeasurement" class="panel project-measurement" aria-labelledby="project-measurement-title" role="status" aria-live="polite">
+            <div class="docker-subsection-heading">
+              <div>
+                <p class="eyebrow">{{ projectMeasurement.relativePath === "." ? "approved root" : projectMeasurement.relativePath }}</p>
+                <h3 id="project-measurement-title">Measured logical bytes for {{ projectMeasurement.name }}</h3>
+              </div>
+              <span :class="projectMeasurementAuthoritative ? 'readonly-tag' : 'review-tag'">{{ projectCountLabel(projectMeasurement) }}</span>
+            </div>
+            <div class="artifact-metrics">
+              <span><small>Project total (logical)</small><b>{{ measuredValue(projectMeasurement.total) }}</b></span>
+              <span><small>Reclaimable</small><b>{{ measuredValue(projectMeasurement.reclaimable) }}</b></span>
+              <span><small>Artifacts measured</small><b>{{ projectMeasurement.artifacts.length }}</b></span>
+            </div>
+            <p class="muted">{{ projectMeasurement.message }}</p>
+            <ul class="artifact-list">
+              <li v-for="artifact in projectMeasurement.artifacts" :key="artifact.path">
+                <div class="artifact-title">
+                  <strong>{{ artifact.name }}</strong>
+                  <span :class="artifact.complete && !artifact.truncated ? 'readonly-tag' : 'review-tag'">{{ countLabel(artifact) }}</span>
+                </div>
+                <div class="artifact-metrics">
+                  <span><small>Logical bytes</small><b>{{ measuredValue(artifact.measured) }}</b></span>
+                  <span><small>Files · directories</small><b>{{ artifact.files }} · {{ artifact.directories }}</b></span>
+                  <span><small>Reclaimable</small><b>{{ measuredValue(artifact.reclaimable) }}</b></span>
+                </div>
+                <ul v-if="artifact.skipped.length" class="measurement-skip-list">
+                  <li v-for="skip in artifact.skipped" :key="`${skip.kind}:${skip.relativePath}`">
+                    <strong>{{ skip.relativePath }}</strong>
+                    <span>{{ projectSkipLabel(skip.kind) }} — {{ skip.reason }}</span>
+                  </li>
+                </ul>
+              </li>
+            </ul>
+            <ul v-if="projectMeasurement.exclusions.length" class="exclusion-list">
+              <li v-for="rule in projectMeasurement.exclusions" :key="rule.rule">
+                <code>{{ rule.relativePath }}</code>
+                <span>{{ rule.matched ? "Applied; its bytes are not in the total" : "Matched nothing in this project" }}</span>
+              </li>
+            </ul>
+            <p class="measurement-boundary">{{ projectMeasurement.boundary }}</p>
+            <ul v-if="projectMeasurement.warnings?.length" class="docker-warnings">
+              <li v-for="warning in projectMeasurement.warnings" :key="warning">{{ warning }}</li>
+            </ul>
+          </section>
 
           <details v-if="projectDiscovery.skipped.length" class="project-skipped">
             <summary>Recorded and not traversed ({{ projectDiscovery.skipped.length }})</summary>

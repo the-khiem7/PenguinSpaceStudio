@@ -106,8 +106,8 @@ func (s *AppService) Close() error {
 func (s *AppService) Dashboard() core.Dashboard {
 	return core.Dashboard{
 		ApplicationName: "PenguinSpace",
-		Stage:           "M4.1 read-only project storage discovery",
-		SafetyMessage:   "Project discovery lists marker-backed projects and claimed generated directories below the approved root only; sizes, reclaim estimates, plans, and deletion remain unavailable.",
+		Stage:           "M4.2 project storage measurement with exclusions",
+		SafetyMessage:   "Project artifacts are measured as exact logical bytes with recorded exclusions and safety skips; that value is not physical reclaim, and reclaim estimates, plans, and deletion remain unavailable.",
 	}
 }
 
@@ -155,6 +155,26 @@ func (s *AppService) DiscoverProjectStorage() (core.ProjectDiscovery, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 	return s.projectInspect.Discover(ctx, root), nil
+}
+
+// MeasureProjectStorage measures the claimed generated directories of one discovered
+// project as exact logical bytes. The project and its artifacts are re-derived from a
+// fresh discovery pass, exclusions are validated against the approved root, and no
+// path is created, modified, or removed.
+func (s *AppService) MeasureProjectStorage(projectPath string, exclusions []string) (core.ProjectMeasurement, error) {
+	s.providerMu.Lock()
+	root := s.workspaceRoot
+	s.providerMu.Unlock()
+	if root == "" {
+		return core.ProjectMeasurement{}, errors.New("approve a workspace root before measuring project storage")
+	}
+
+	s.projectMu.Lock()
+	defer s.projectMu.Unlock()
+
+	ctx, cancel := context.WithTimeout(context.Background(), 120*time.Second)
+	defer cancel()
+	return s.projectInspect.MeasureProject(ctx, root, projectPath, exclusions)
 }
 
 func (s *AppService) DiscoverDeveloperProviders() []core.ProviderAvailability {

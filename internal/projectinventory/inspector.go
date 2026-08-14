@@ -26,15 +26,18 @@ type Limits struct {
 	MaxDepth       int
 	MaxDirectories int
 	MaxProjects    int
+	// MaxMeasuredEntries bounds one project measurement pass. Reaching it produces an
+	// explicit partial count instead of a smaller total.
+	MaxMeasuredEntries int
 }
 
 // maxRecordedSkips bounds the recorded skip list so one pathological layout cannot
 // produce an unbounded report. Reaching it marks the snapshot incomplete.
 const maxRecordedSkips = 500
 
-// DefaultLimits are the fixed M4.1 traversal bounds.
+// DefaultLimits are the fixed M4.1 traversal and M4.2 measurement bounds.
 func DefaultLimits() Limits {
-	return Limits{MaxDepth: 6, MaxDirectories: 20000, MaxProjects: 500}
+	return Limits{MaxDepth: 6, MaxDirectories: 20000, MaxProjects: 500, MaxMeasuredEntries: 400000}
 }
 
 // markerEcosystems maps an exact-case marker file name to the ecosystem it proves.
@@ -121,6 +124,9 @@ func NewInspectorWithReader(limits Limits, reader DirectoryReader) *Inspector {
 	}
 	if limits.MaxProjects <= 0 {
 		limits.MaxProjects = defaults.MaxProjects
+	}
+	if limits.MaxMeasuredEntries <= 0 {
+		limits.MaxMeasuredEntries = defaults.MaxMeasuredEntries
 	}
 	return &Inspector{limits: limits, reader: reader}
 }

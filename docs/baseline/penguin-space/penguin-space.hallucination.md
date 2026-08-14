@@ -4,7 +4,7 @@ pack: "penguin-space"
 document: "hallucination"
 status: "active"
 updated: "2026-08-14"
-code_ref: "f421412 (M4.1 read-only project discovery)"
+code_ref: "9a90be9 (M4.2 project storage measurement)"
 ---
 
 # Decisions, unknowns, and claim boundaries
@@ -33,6 +33,7 @@ code_ref: "f421412 (M4.1 read-only project discovery)"
 
 **Open questions and required evidence**
 
+- M4.2 measurement is implemented and Docker-verified with fixture evidence for exact counts, exclusion behaviour and reporting, rejected unsafe rules, safety-over-exclusion ordering, sparse-file logical size, non-regular and unreadable paths, the entry budget, byte overflow, cancellation, and incomplete-discovery attribution. It has not been exercised through the Windows UI, so no runtime claim exists for a real dependency tree, for measurement duration on a large artifact, or for NTFS-specific behaviour. A measured value is logical bytes only; it is not physical reclaim and not a reclaim estimate.
 - M4.1 discovery is runtime-confirmed on Windows against the real approved root `AgentMindStudio`: marker-backed projects, marker-claimed artifacts with unavailable sizes, an explicit no-claimed-artifact statement, a **Snapshot truncated** badge, the recorded `.git` and depth-bound skips, and no cleanup control. Its case-insensitive directory-boundary behavior and junction handling were not exercised by that run because the observed layout contained neither a differently cased boundary name nor a reparse point; both remain fixture-only evidence. Nothing in M4.1 evidences measurement, reclaimability, last-used state, or safe deletion of any project artifact.
 - M3.1 and M3.3 daemon-available and daemon-unavailable Windows behavior are runtime-confirmed. M3.5 exact-network semantics are implementation- and fake-runner-verified but have not removed a live disposable network through the Windows UI. M3.6 has Windows-native sparse/reparse fixture evidence but has not been exercised through the UI against installed WSL registrations/VHDX layouts. These gaps do not authorize broader Docker cleanup, WSL/VHDX mutation, or inference from labels, counts, paths, relationships, or disk-usage summaries.
 - BuildKit is confirmed selected-builder scope with shared records and no canonical project identity; project attribution is prohibited pending new evidence.
@@ -68,6 +69,18 @@ code_ref: "f421412 (M4.1 read-only project discovery)"
 | How are links and unreadable paths handled? | Reparse points (symbolic links, junctions, and other reparse tags) are recorded and never traversed; a read error records the path, emits a warning, and marks the snapshot incomplete. | Treating an omitted subtree as absent, empty, or zero-byte. |
 | What may be measured in M4.1? | Nothing. Every project and artifact measurement is `unavailable`. | Logical bytes, physical bytes, reclaim estimates, and any total presented as reclaimable space. |
 | What may act? | Nothing. M4.1 exposes no plan, confirmation, executor, or deletion path. | Every destructive project-artifact operation, which is gated behind M4.4 after M4.2 and M4.3 acceptance. |
+
+### M4.2 exclusion-sourcing decision (2026-08-14)
+
+| Question | Decision | What remains blocked |
+|---|---|---|
+| Where do exclusion rules come from? | The frontend may propose a per-request list of paths under the approved root. The backend validates every rule, applies it for that one measurement, and does not persist it. | A workspace ignore file and any persisted exclusion setting, which belong with M5 settings persistence; glob or regex rules; and rules outside the approved root. |
+| What can an exclusion do? | Only reduce measurement scope. Every applied rule is returned with the result, and every excluded path is recorded. | Re-including a path that a safety rule rejected, and applying a rule that is not reported to the user. |
+| How is an exclusion distinguished from a failure? | An exclusion is deliberate and recorded as `excluded-by-rule`. An unreadable path, a reparse point, and a non-regular file are safety skips with their own kinds. A budget exhaustion is a separate truncation state. | Presenting any of these as each other, or hiding a read failure inside an excluded region. |
+| What does a measured number mean? | Exact `uint64` logical bytes of the regular files that were actually counted, with a separate completeness flag. Any exclusion, safety skip, or truncation clears completeness. | Presenting a scoped total as the full size of a directory, and presenting logical bytes as physical reclaim; hardlinks, sparse files, and cluster size all break that equivalence. |
+| Is reclaimable space derived from a measurement? | No. Reclaimable stays `unavailable` for every artifact and every project total in M4.2. | Any reclaim estimate, which requires the M4.3 and M4.4 evidence. |
+
+**Rejected alternatives:** a workspace `.penguinspace-ignore` file, which adds a parser surface (comments, absolute paths, escaping entries, encoding, and mid-review edits) before settings persistence exists; and a fixed backend-only exclusion set, which cannot address a shared hardlinked subtree that would otherwise be double counted across projects.
 
 **Rejected alternative:** measuring bytes during discovery. The uv provider already proved that recursive traversal of a real cache can exceed the interactive budget, so discovery and measurement are separated so a slow or partial measurement cannot degrade the honesty of the project list.
 

@@ -205,3 +205,15 @@ button:disabled { opacity: .55; cursor: wait; }
 .project-boundary strong { color: #9fe3d5; }
 .project-boundary p { margin: 8px 0 0; }
 @media (max-width: 1100px) { .project-summary { align-items: flex-start; flex-direction: column; } .artifact-metrics { grid-template-columns: 1fr; } }
+
+.project-measure-button { margin: 16px 0 0; }
+.measurement-scope textarea { width: 100%; margin: 12px 0 0; padding: 10px 12px; border: 1px solid #2c3648; border-radius: 8px; background: #151c29; color: #e8eef7; font-family: inherit; font-size: .82rem; line-height: 1.5; resize: vertical; }
+.measurement-scope textarea:focus-visible { outline: 2px solid #6ea8fe; outline-offset: 2px; }
+.measurement-scope p { margin: 10px 0 0; }
+.project-measurement > .artifact-metrics { margin: 16px 0 0; }
+.project-measurement p { margin: 12px 0 0; }
+.measurement-skip-list, .exclusion-list { list-style: none; display: grid; gap: 8px; margin: 10px 0 0; padding: 0; }
+.measurement-skip-list li, .exclusion-list li { display: grid; gap: 4px; padding: 10px; border: 1px solid #4a3a26; border-radius: 8px; background: #1d1912; }
+.measurement-skip-list strong, .exclusion-list code { color: #f0c98a; overflow-wrap: anywhere; }
+.measurement-skip-list span, .exclusion-list span { color: #b5a68f; line-height: 1.45; }
+.measurement-boundary { color: #9fe3d5; line-height: 1.45; }

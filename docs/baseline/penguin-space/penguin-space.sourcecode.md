@@ -4,7 +4,7 @@ pack: "penguin-space"
 document: "sourcecode"
 status: "active"
 updated: "2026-08-14"
-code_ref: "f421412 (M4.1 read-only project discovery)"
+code_ref: "9a90be9 (M4.2 project storage measurement)"
 ---
 
 # Architecture and implementation
@@ -128,7 +128,19 @@ Traversal is bounded by fixed depth, directory-count, and project-count limits t
 
 Failures fail closed. A read or revalidation error records the path, emits a warning, and clears `Complete`; an exhausted depth, directory, project, or recorded-skip bound sets `Truncated` and clears `Complete`; a cancelled context stops the pass with a warning. The summary counts only directories that were actually read, so an omission is never presented as absence.
 
-`AppService.DiscoverProjectStorage` serializes discovery under its own mutex, requires an approved root, and applies a 30-second context. The Vue **Projects** surface renders projects, markers, ecosystems, claimed artifacts with **Unavailable** sizes, and the recorded skip list. Its status badge is authoritative only when the snapshot is approved, complete, and untruncated, and its zero-project message refuses to describe an incomplete snapshot as an empty root. No inspect, review, confirm, plan, or delete control exists on this surface.
+`AppService.DiscoverProjectStorage` serializes discovery under its own mutex, requires an approved root, and applies a 30-second context.
+
+## M4.2 project storage measurement
+
+`Inspector.MeasureProject` measures the claimed artifacts of one project as exact `uint64` logical bytes. It first re-runs discovery, so the project identity, its markers, and its artifact list all come from a fresh pass rather than from the caller; an artifact path, a marker-less directory, and an unapproved root are rejected. When the project is absent, the error distinguishes a cancelled pass, an incomplete or truncated snapshot, and a genuinely non-project path, so an unfinished traversal is never reported as proof of absence.
+
+Exclusion rules arrive per request. A relative rule resolves against the approved root, an absolute rule must already be inside it, and every candidate passes `common.ValidateWorkspaceTarget`, which rejects escapes, the root itself, and any component that is a symbolic link. Globs are refused outright. Accepted rules are deduplicated case-insensitively, never persisted, and returned with the result together with a matched flag; a rule that matched nothing produces a warning, and a rule subsumed by a broader applied rule is marked matched so overlapping scopes are not misreported. `isWithin` compares cleaned path components, so `build-output` is never treated as being inside `build`.
+
+Safety precedes scope inside the walk. A reparse point is recorded as `reparse-point` even when an exclusion also covers it, an unreadable directory or unreadable size is `unreadable`, and a device, socket, or pipe is `non-regular`. Only regular files contribute bytes, counted once per path, so a hardlinked file is counted in every artifact that links it. Every directory is re-checked with a no-follow `Lstat` before it is read.
+
+Honesty rules govern the numbers. An excluded artifact, and an artifact whose own root could not be read, report `unavailable` instead of a measured zero, and such artifacts are left out of the project total with an explicit warning rather than summed as zero. Per-artifact and per-project additions are overflow-checked; an overflowing artifact stops with a partial count, and an overflowing total becomes `unavailable`. A 400,000-entry budget, a 64-level measurement depth bound independent of the shallower discovery depth, and a per-artifact skip-record cap bound one pass, and each of them clears completeness. Reclaimable bytes are `unavailable` on every artifact and on the project total.
+
+`AppService.MeasureProjectStorage` serializes measurement under the same project mutex, requires an approved root, and applies a 120-second context. Vue adds a per-project measure control, a non-persisted exclusion textarea whose copy states that rules resolve against the approved root, per-artifact and per-project values, a count label that separates a full count from an excluded scope, an incomplete count, and a partial count, the applied-rule list, the recorded skips, and the logical-versus-physical boundary. `formatBytes` now refuses to render a value whose measurement kind is not a measured or estimated kind. No plan, confirmation, executor, prune, or deletion path exists on this surface. The Vue **Projects** surface renders projects, markers, ecosystems, claimed artifacts with **Unavailable** sizes, and the recorded skip list. Its status badge is authoritative only when the snapshot is approved, complete, and untruncated, and its zero-project message refuses to describe an incomplete snapshot as an empty root. No inspect, review, confirm, plan, or delete control exists on this surface.
 
 ## Required core models
 

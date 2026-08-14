@@ -4,7 +4,7 @@ pack: "penguin-space"
 document: "useguide"
 status: "draft"
 updated: "2026-08-14"
-code_ref: "f421412 (M4.1 read-only project discovery)"
+code_ref: "9a90be9 (M4.2 project storage measurement)"
 ---
 
 # Intended product interaction contract
@@ -68,6 +68,16 @@ The surface is marked **Observation only** and has no action beyond refresh. It 
 A project card is rendered only when an exact marker file was found in that directory, and it lists the markers plus the ecosystems they prove. A generated directory is listed only when its allow-list name is claimed by a marker in the same project; every artifact shows storage class, risk, recovery cost, its claiming ecosystem, and a **Size** of **Unavailable**. There is no Inspect, Review, Confirm, Clean, or delete control on this surface in M4.1.
 
 The status badge reads **Snapshot complete** only when the root was approved, no read failed, and no bound was reached; otherwise it reads **Snapshot truncated** or **Snapshot incomplete**, and the zero-project message explicitly refuses to present the root as empty. A collapsed **Recorded and not traversed** list shows every skipped path with its reason: a reparse point that was never followed, version-control metadata, an allow-list name without a claiming marker, the depth bound, or an unreadable directory.
+
+## M4.2 project storage measurement
+
+Each project card with at least one claimed artifact exposes **Measure logical bytes**. Measurement is a separate, explicit step: discovery alone never reads a byte.
+
+**Exclusions for the next measurement** takes one path per line, resolved against the approved root rather than the selected project. The backend rejects a pattern, a path outside the root, the root itself, and any path that runs through a reparse point. Rules are not saved; they apply to the next measurement only, and each one is listed with the result as either applied or as having matched nothing.
+
+A result shows the project total and each artifact's logical bytes, file and directory counts, and **Reclaimable** as **Unavailable**. A count is labelled **Full count** only when nothing was excluded, skipped, or truncated; otherwise it reads **Excluded scope** when only rules reduced it, **Incomplete count** when a path could not be read or was not a regular file, or **Partial count** when a budget or depth bound stopped the walk. An artifact that was excluded, or whose own directory could not be read, shows **Unavailable** rather than `0 B`, because its bytes are unknown rather than zero, and it is left out of the project total with a warning.
+
+The boundary statement is displayed with every result: measured values are logical bytes counted once per path, not physical host reclaim, because hardlinks, sparse files, and cluster size break that equivalence. There is no plan, confirmation, cleanup, or delete control on this surface in M4.2.
 
 ## Scan-to-clean flow
 

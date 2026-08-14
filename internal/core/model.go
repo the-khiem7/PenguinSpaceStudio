@@ -321,6 +321,8 @@ const (
 	ProjectSkipUnclaimedName    ProjectSkipKind = "unclaimed-generated-name"
 	ProjectSkipDepthLimit       ProjectSkipKind = "depth-limit"
 	ProjectSkipUnreadable       ProjectSkipKind = "unreadable"
+	ProjectSkipExcludedByRule   ProjectSkipKind = "excluded-by-rule"
+	ProjectSkipNonRegular       ProjectSkipKind = "non-regular"
 )
 
 type ProjectArtifactObservation struct {
@@ -361,6 +363,47 @@ type ProjectDiscovery struct {
 	Warnings     []string             `json:"warnings"`
 	Message      string               `json:"message"`
 	Boundary     string               `json:"boundary"`
+}
+
+type ProjectExclusionRule struct {
+	Rule         string `json:"rule"`
+	RelativePath string `json:"relativePath"`
+	Matched      bool   `json:"matched"`
+}
+
+type ProjectArtifactMeasurement struct {
+	Name         string               `json:"name"`
+	Path         string               `json:"path"`
+	RelativePath string               `json:"relativePath"`
+	Ecosystem    ProjectEcosystem     `json:"ecosystem"`
+	StorageClass StorageClass         `json:"storageClass"`
+	Risk         RiskLevel            `json:"risk"`
+	RecoveryCost RecoveryCost         `json:"recoveryCost"`
+	Measured     Measurement          `json:"measured"`
+	Reclaimable  Measurement          `json:"reclaimable"`
+	Files        uint64               `json:"files"`
+	Directories  uint64               `json:"directories"`
+	Complete     bool                 `json:"complete"`
+	Truncated    bool                 `json:"truncated"`
+	Skipped      []ProjectSkippedPath `json:"skipped"`
+	Boundary     string               `json:"boundary"`
+}
+
+type ProjectMeasurement struct {
+	Name         string                       `json:"name"`
+	Path         string                       `json:"path"`
+	RelativePath string                       `json:"relativePath"`
+	Root         string                       `json:"root"`
+	MeasuredAt   time.Time                    `json:"measuredAt"`
+	Artifacts    []ProjectArtifactMeasurement `json:"artifacts"`
+	Total        Measurement                  `json:"total"`
+	Reclaimable  Measurement                  `json:"reclaimable"`
+	Complete     bool                         `json:"complete"`
+	Truncated    bool                         `json:"truncated"`
+	Exclusions   []ProjectExclusionRule       `json:"exclusions"`
+	Warnings     []string                     `json:"warnings"`
+	Message      string                       `json:"message"`
+	Boundary     string                       `json:"boundary"`
 }
 
 type Dashboard struct {
