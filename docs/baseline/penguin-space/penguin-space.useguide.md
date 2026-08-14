@@ -4,7 +4,7 @@ pack: "penguin-space"
 document: "useguide"
 status: "draft"
 updated: "2026-08-14"
-code_ref: "HEAD (M4.1 read-only project discovery)"
+code_ref: "f421412 (M4.1 read-only project discovery)"
 ---
 
 # Intended product interaction contract

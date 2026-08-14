@@ -4,7 +4,7 @@ pack: "penguin-space"
 document: "introduction"
 status: "active"
 updated: "2026-08-14"
-code_ref: "HEAD (M4.1 read-only project discovery)"
+code_ref: "f421412 (M4.1 read-only project discovery)"
 ---
 
 # PenguinSpace baseline
@@ -105,7 +105,7 @@ It is not a generic PC cleaner or merely a GUI for cache-clearing commands. Its 
 
 ## Save checkpoint — M4.1 read-only project discovery
 
-**Code reference:** this M4.1 phase commit (working tree at the time of writing; the pack must be re-pointed to its SHA after the commit).
+**Code reference:** `f421412` (`feat(projects): add read-only project discovery with M4.1 checkpoint`).
 
 - M4 is refined into four fixture-bounded phases: M4.1 read-only discovery, M4.2 exact logical measurement with exclusions, M4.3 project detail plus a last-used heuristic decision, and M4.4 one reviewed exact artifact removal. A phase is authorized only by the recorded acceptance of the phase before it.
 - `internal/projectinventory` implements M4.1. Projects come only from exact marker files, and a generated directory is reported only when its allow-list name is claimed by a marker in the same directory. Every measurement is `unavailable`; there is no plan, confirmation, executor, estimate, or deletion path.

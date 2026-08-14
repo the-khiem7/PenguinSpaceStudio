@@ -4,7 +4,7 @@ pack: "penguin-space"
 document: "sourcecode"
 status: "active"
 updated: "2026-08-14"
-code_ref: "HEAD (M4.1 read-only project discovery)"
+code_ref: "f421412 (M4.1 read-only project discovery)"
 ---
 
 # Architecture and implementation
