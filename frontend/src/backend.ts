@@ -241,6 +241,40 @@ export type ProjectArtifactMeasurement = {
   boundary: string;
 };
 
+export type ProjectArtifactRemovalMethod = "filesystem-fallback";
+
+export type ProjectArtifactRemovalPlan = {
+  id: string;
+  root: string;
+  projectPath: string;
+  artifactPath: string;
+  artifactName: string;
+  relativePath: string;
+  ecosystem: ProjectEcosystem;
+  risk: "Review";
+  recoveryCost: string;
+  method: ProjectArtifactRemovalMethod;
+  consequence: string;
+  measuredBefore: Measurement;
+  createdAt: string;
+};
+
+export type ProjectArtifactRemovalOutcome = {
+  planId: string;
+  artifactPath: string;
+  artifactName: string;
+  method: ProjectArtifactRemovalMethod;
+  removalAttempted: boolean;
+  removalCompleted: boolean;
+  verifiedAbsent: boolean;
+  measuredBefore: Measurement;
+  measuredAfter: Measurement;
+  reclaimedActual: Measurement;
+  historyRecorded: boolean;
+  message: string;
+  failure?: string;
+};
+
 export type ProjectMeasurement = {
   name: string;
   path: string;
@@ -299,6 +333,10 @@ export const backend = {
   measureProjectStorage: (projectPath: string, exclusions: string[]): Promise<ProjectMeasurement> =>
     AppService.MeasureProjectStorage(projectPath, exclusions) as Promise<ProjectMeasurement>,
   cancelProjectMeasurement: (): Promise<boolean> => AppService.CancelProjectMeasurement() as Promise<boolean>,
+  inspectProjectArtifactRemoval: (projectPath: string, artifactPath: string): Promise<ProjectArtifactRemovalPlan> =>
+    AppService.InspectProjectArtifactRemoval(projectPath, artifactPath) as Promise<ProjectArtifactRemovalPlan>,
+  executeProjectArtifactRemoval: (planId: string): Promise<ProjectArtifactRemovalOutcome> =>
+    AppService.ExecuteProjectArtifactRemoval(planId, true) as Promise<ProjectArtifactRemovalOutcome>,
   inspectDeveloperProvider: (providerId: string): Promise<ProviderInspection> => AppService.InspectDeveloperProvider(providerId) as Promise<ProviderInspection>,
   executeDeveloperProvider: (providerId: string): Promise<ProviderCleanupOutcome> => AppService.ExecuteDeveloperProvider(providerId, true) as Promise<ProviderCleanupOutcome>,
 };

@@ -4,7 +4,7 @@ pack: "penguin-space"
 document: "useguide"
 status: "draft"
 updated: "2026-08-14"
-code_ref: "a1d04fe (M4.2/M4.3 Windows acceptance on v0.1.7)"
+code_ref: "HEAD (M4.4 reviewed exact artifact removal)"
 ---
 
 # Intended product interaction contract

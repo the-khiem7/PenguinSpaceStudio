@@ -230,3 +230,18 @@ button:disabled { opacity: .55; cursor: wait; }
 .project-measure-actions { display: flex; gap: 10px; margin: 16px 0 0; flex-wrap: wrap; }
 .project-measure-actions .project-measure-button, .project-measure-actions .project-cancel-button { margin: 0; }
 .project-cancel-button { color: #f0c98a; border-color: #4a3a26; }
+
+.artifact-remove-button { margin: 4px 0 0; width: fit-content; padding: 8px 10px; font-size: .78rem; color: #ffc2c7; border-color: #562f38; background: #241a1e; }
+.removal-review { border-color: #6c3f45; background: #2a1c1f; margin-top: 16px; }
+.removal-review-summary { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 10px; margin: 18px 0; }
+.removal-review-summary > div { min-width: 0; display: grid; gap: 6px; padding: 13px; border: 1px solid #5a3238; border-radius: 8px; background: #241a1e; }
+.removal-review-summary dt { color: #d9a3a8; font-size: .76rem; }
+.removal-review-summary dd { margin: 0; color: #f4f7fb; overflow-wrap: anywhere; }
+.removal-review-summary code { color: #ffc2c7; }
+.removal-review > p { color: #e0c4c7; line-height: 1.5; }
+.removal-review-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 18px; }
+.danger-button { background: #d94f5c; color: #2a0e11; }
+.removal-outcome { margin: 16px 0 0; border: 1px solid #31515b; border-radius: 9px; color: #9fe3d5; background: #182b31; padding: 13px 15px; line-height: 1.45; display: grid; gap: 6px; }
+.removal-outcome p { margin: 0; }
+.removal-outcome small { color: #b5c3d5; overflow-wrap: anywhere; }
+.removal-outcome.failed { border-color: #805b32; color: #ffd2a8; background: #30251c; }

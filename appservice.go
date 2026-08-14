@@ -42,6 +42,7 @@ type AppService struct {
 	dockerRemoval   *dockerinventory.NetworkRemovalController
 	wslInspector    *wslinventory.Inspector
 	projectInspect  *projectinventory.Inspector
+	projectRemoval  *projectinventory.RemovalController
 	projectMu       sync.Mutex
 	projectCancelMu sync.Mutex
 	projectCancel   *projectinventory.CancelSignal
@@ -108,8 +109,8 @@ func (s *AppService) Close() error {
 func (s *AppService) Dashboard() core.Dashboard {
 	return core.Dashboard{
 		ApplicationName: "PenguinSpace",
-		Stage:           "M4.3 project detail and measurement cancellation",
-		SafetyMessage:   "Project artifacts are measured as exact logical bytes with recorded exclusions and safety skips, and a running measurement can be cancelled explicitly; that value is not physical reclaim, and reclaim estimates, plans, and deletion remain unavailable.",
+		Stage:           "M4.4 reviewed exact project-artifact removal",
+		SafetyMessage:   "Removal targets exactly one already-claimed generated directory, revalidated immediately before deletion, using filesystem removal only; every other path and every physical-reclaim claim remain unavailable.",
 	}
 }
 

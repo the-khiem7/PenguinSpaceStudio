@@ -431,6 +431,47 @@ type ProjectMeasurement struct {
 	Boundary   string                 `json:"boundary"`
 }
 
+// ProjectArtifactRemovalMethod records how a removal was actually performed. M4.4's
+// first slice only ever uses the filesystem fallback; see the 2026-08-14
+// removal-method decision for why tool-native delegation is deferred.
+type ProjectArtifactRemovalMethod string
+
+const ProjectArtifactRemovalMethodFilesystemFallback ProjectArtifactRemovalMethod = "filesystem-fallback"
+
+const ProjectArtifactRemovalProviderID = "project.artifact-removal"
+
+type ProjectArtifactRemovalPlan struct {
+	ID             string                       `json:"id"`
+	Root           string                       `json:"root"`
+	ProjectPath    string                       `json:"projectPath"`
+	ArtifactPath   string                       `json:"artifactPath"`
+	ArtifactName   string                       `json:"artifactName"`
+	RelativePath   string                       `json:"relativePath"`
+	Ecosystem      ProjectEcosystem             `json:"ecosystem"`
+	Risk           RiskLevel                    `json:"risk"`
+	RecoveryCost   RecoveryCost                 `json:"recoveryCost"`
+	Method         ProjectArtifactRemovalMethod `json:"method"`
+	Consequence    string                       `json:"consequence"`
+	MeasuredBefore Measurement                  `json:"measuredBefore"`
+	CreatedAt      time.Time                    `json:"createdAt"`
+}
+
+type ProjectArtifactRemovalOutcome struct {
+	PlanID           string                       `json:"planId"`
+	ArtifactPath     string                       `json:"artifactPath"`
+	ArtifactName     string                       `json:"artifactName"`
+	Method           ProjectArtifactRemovalMethod `json:"method"`
+	RemovalAttempted bool                         `json:"removalAttempted"`
+	RemovalCompleted bool                         `json:"removalCompleted"`
+	VerifiedAbsent   bool                         `json:"verifiedAbsent"`
+	MeasuredBefore   Measurement                  `json:"measuredBefore"`
+	MeasuredAfter    Measurement                  `json:"measuredAfter"`
+	ReclaimedActual  Measurement                  `json:"reclaimedActual"`
+	HistoryRecorded  bool                         `json:"historyRecorded"`
+	Message          string                       `json:"message"`
+	Failure          string                       `json:"failure,omitempty"`
+}
+
 type Dashboard struct {
 	ApplicationName string `json:"applicationName"`
 	Stage           string `json:"stage"`

@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, ref } from "vue";
-import { backend, ElevationProbeMode, type DockerAwareness, type DockerNetworkRemovalOutcome, type DockerNetworkRemovalPlan, type DockerScopedResource, type ElevationStatus, type Measurement, type MeasurementKind, type ProjectDiscovery, type ProjectMeasurement, type ProjectSkipKind, type ProjectSkippedPath, type ProviderAvailability, type TimeObservation, type Scenario, type WSLAwareness } from "./backend";
+import { backend, ElevationProbeMode, type DockerAwareness, type DockerNetworkRemovalOutcome, type DockerNetworkRemovalPlan, type DockerScopedResource, type ElevationStatus, type Measurement, type MeasurementKind, type ProjectArtifactRemovalOutcome, type ProjectArtifactRemovalPlan, type ProjectDiscovery, type ProjectMeasurement, type ProjectSkipKind, type ProjectSkippedPath, type ProviderAvailability, type TimeObservation, type Scenario, type WSLAwareness } from "./backend";
 import ProviderCard from "./components/ProviderCard.vue";
 
 type ProviderDefinition = {
@@ -61,6 +61,11 @@ const projectMeasureError = ref("");
 const projectMeasureErrorPath = ref("");
 const projectCancelling = ref(false);
 const selectedProjectPath = ref("");
+const removalPlan = ref<ProjectArtifactRemovalPlan | null>(null);
+const removalOutcome = ref<ProjectArtifactRemovalOutcome | null>(null);
+const removalReviewingPath = ref("");
+const removalRemoving = ref(false);
+const removalError = ref("");
 let elevationPoller: ReturnType<typeof setInterval> | undefined;
 
 const reclaimed = computed(() => scenario.value?.verification.reclaimedActual.bytes ?? 0);
@@ -148,6 +153,20 @@ async function refreshProjectDiscovery() {
   projectError.value = "";
   projectDiscovery.value = null;
   closeProjectDetail();
+  await runProjectDiscovery();
+}
+
+// Refreshes the discovery snapshot without closing the currently open detail
+// panel, so a just-verified removal outcome stays visible instead of vanishing the
+// instant the fresh snapshot (correctly, no longer showing the removed artifact) is
+// re-derived after a successful removal.
+async function refreshProjectDiscoveryKeepingSelection() {
+  projectLoading.value = true;
+  projectError.value = "";
+  await runProjectDiscovery();
+}
+
+async function runProjectDiscovery() {
   try {
     projectDiscovery.value = await backend.discoverProjectStorage();
   } catch (cause) {
@@ -170,6 +189,7 @@ function selectProject(path: string) {
   projectMeasurement.value = null;
   projectMeasureError.value = "";
   projectMeasureErrorPath.value = "";
+  clearRemovalState();
   // The detail panel renders below the project grid and can land outside the
   // current viewport, especially with several projects in the grid. Without this,
   // selecting a project can look unresponsive even though the state changed
@@ -190,6 +210,50 @@ function closeProjectDetail() {
   projectMeasurement.value = null;
   projectMeasureError.value = "";
   projectMeasureErrorPath.value = "";
+  clearRemovalState();
+}
+
+function clearRemovalState() {
+  removalPlan.value = null;
+  removalOutcome.value = null;
+  removalReviewingPath.value = "";
+  removalError.value = "";
+}
+
+async function reviewArtifactRemoval(projectPath: string, artifactPath: string) {
+  removalReviewingPath.value = artifactPath;
+  removalError.value = "";
+  removalPlan.value = null;
+  removalOutcome.value = null;
+  try {
+    removalPlan.value = await backend.inspectProjectArtifactRemoval(projectPath, artifactPath);
+  } catch (cause) {
+    removalError.value = `Removal review failed: ${String(cause)}`;
+  } finally {
+    removalReviewingPath.value = "";
+  }
+}
+
+async function executeArtifactRemoval() {
+  if (!removalPlan.value) return;
+  removalRemoving.value = true;
+  removalError.value = "";
+  try {
+    removalOutcome.value = await backend.executeProjectArtifactRemoval(removalPlan.value.id);
+    removalPlan.value = null;
+    // A removal that changed the filesystem invalidates the current discovery
+    // snapshot and any pending measurement result for this project, so both are
+    // cleared and the project list is re-derived from a fresh pass.
+    projectMeasurement.value = null;
+    projectMeasureError.value = "";
+    projectMeasureErrorPath.value = "";
+    await refreshProjectDiscoveryKeepingSelection();
+  } catch (cause) {
+    removalError.value = `Removal failed: ${String(cause)}`;
+    removalPlan.value = null;
+  } finally {
+    removalRemoving.value = false;
+  }
 }
 
 function projectSkipLabel(kind: ProjectSkipKind) {
@@ -829,6 +893,11 @@ function availabilityMessage(providerID: string) {
                   <span :title="lastModifiedDisclosure"><small>Last modified</small><b>{{ lastModifiedValue(artifact.lastModified) }}</b></span>
                 </div>
                 <small>{{ artifact.boundary }}</small>
+                <button
+                  class="secondary artifact-remove-button"
+                  :disabled="Boolean(removalReviewingPath) || removalRemoving"
+                  @click="reviewArtifactRemoval(selectedProject!.path, artifact.path)"
+                >{{ removalReviewingPath === artifact.path ? "Reviewing…" : "Review removal" }}</button>
               </li>
             </ul>
 
@@ -864,6 +933,38 @@ function availabilityMessage(providerID: string) {
               ></textarea>
               <p class="muted">{{ projectExclusions.length === 0 ? "No exclusion is applied; measurement will count every readable regular file." : `${projectExclusions.length} exclusion(s) will be sent with the next measurement.` }}</p>
             </section>
+
+            <p v-if="removalError" class="error" role="alert">{{ removalError }}</p>
+
+            <section v-if="removalPlan" class="panel removal-review" aria-labelledby="removal-review-title">
+              <div class="docker-subsection-heading">
+                <div>
+                  <p class="eyebrow">M4.4 · Review exact removal</p>
+                  <h4 id="removal-review-title">Remove {{ removalPlan.artifactName }}?</h4>
+                </div>
+                <span class="review-tag">{{ removalPlan.risk }}</span>
+              </div>
+              <dl class="removal-review-summary">
+                <div><dt>Method</dt><dd>Filesystem removal (no tool-native command)</dd></div>
+                <div><dt>Recovery cost</dt><dd>{{ removalPlan.recoveryCost }}</dd></div>
+                <div><dt>Measured before</dt><dd>{{ measuredValue(removalPlan.measuredBefore) }}</dd></div>
+                <div><dt>Path</dt><dd><code :title="removalPlan.artifactPath">{{ removalPlan.relativePath }}</code></dd></div>
+              </dl>
+              <p>{{ removalPlan.consequence }}</p>
+              <p class="muted">Confirmation triggers one immediate re-inspection of this exact project and artifact, then only a filesystem removal of this one path. No other directory is touched, and reclaimed bytes are reported only as logical bytes, never physical reclaim.</p>
+              <div class="removal-review-actions">
+                <button class="secondary" :disabled="removalRemoving" @click="removalPlan = null">Cancel</button>
+                <button class="danger-button" :disabled="removalRemoving" @click="executeArtifactRemoval">{{ removalRemoving ? "Removing and verifying…" : "Confirm exact removal" }}</button>
+              </div>
+            </section>
+
+            <article v-if="removalOutcome" class="removal-outcome" :class="{ failed: Boolean(removalOutcome.failure) }" role="status" aria-live="polite">
+              <strong>{{ removalOutcome.verifiedAbsent ? "Removal verified" : "Removal needs follow-up" }}</strong>
+              <p>{{ removalOutcome.message }}</p>
+              <small v-if="removalOutcome.failure">{{ removalOutcome.failure }}</small>
+              <small>Attempted: {{ removalOutcome.removalAttempted ? "yes" : "no" }} · Completed: {{ removalOutcome.removalCompleted ? "yes" : "no" }} · Verified absent: {{ removalOutcome.verifiedAbsent ? "yes" : "no" }} · History recorded: {{ removalOutcome.historyRecorded ? "yes" : "no" }}</small>
+              <small>Reclaimed: {{ measuredValue(removalOutcome.reclaimedActual) }} (logical only, not physical host reclaim)</small>
+            </article>
 
             <p v-if="projectMeasureError && projectMeasureErrorPath === selectedProject.path" class="error" role="alert">{{ projectMeasureError }}</p>
 
