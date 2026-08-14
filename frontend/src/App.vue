@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, ref } from "vue";
+import { computed, nextTick, onBeforeUnmount, onMounted, ref } from "vue";
 import { backend, ElevationProbeMode, type DockerAwareness, type DockerNetworkRemovalOutcome, type DockerNetworkRemovalPlan, type DockerScopedResource, type ElevationStatus, type Measurement, type MeasurementKind, type ProjectDiscovery, type ProjectMeasurement, type ProjectSkipKind, type ProjectSkippedPath, type ProviderAvailability, type TimeObservation, type Scenario, type WSLAwareness } from "./backend";
 import ProviderCard from "./components/ProviderCard.vue";
 
@@ -170,6 +170,19 @@ function selectProject(path: string) {
   projectMeasurement.value = null;
   projectMeasureError.value = "";
   projectMeasureErrorPath.value = "";
+  // The detail panel renders below the project grid and can land outside the
+  // current viewport, especially with several projects in the grid. Without this,
+  // selecting a project can look unresponsive even though the state changed
+  // instantly; there is no backend call in this function.
+  scrollToProjectDetail();
+}
+
+function scrollToProjectDetail() {
+  // nextTick waits for Vue to flush the DOM update from the v-if before querying
+  // for the element, otherwise the panel may not exist yet on the first selection.
+  nextTick(() => {
+    document.getElementById("project-detail-panel")?.scrollIntoView({ behavior: "smooth", block: "start" });
+  });
 }
 
 function closeProjectDetail() {
@@ -787,7 +800,7 @@ function availabilityMessage(providerID: string) {
             </article>
           </div>
 
-          <section v-if="selectedProject" class="panel project-detail" aria-labelledby="project-detail-title">
+          <section v-if="selectedProject" id="project-detail-panel" class="panel project-detail" aria-labelledby="project-detail-title">
             <div class="docker-subsection-heading">
               <div>
                 <p class="eyebrow">Project detail · {{ selectedProject.relativePath === "." ? "approved root" : selectedProject.relativePath }}</p>
