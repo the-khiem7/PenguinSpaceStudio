@@ -400,10 +400,14 @@ type ProjectMeasurement struct {
 	Reclaimable  Measurement                  `json:"reclaimable"`
 	Complete     bool                         `json:"complete"`
 	Truncated    bool                         `json:"truncated"`
-	Exclusions   []ProjectExclusionRule       `json:"exclusions"`
-	Warnings     []string                     `json:"warnings"`
-	Message      string                       `json:"message"`
-	Boundary     string                       `json:"boundary"`
+	// Cancelled is true only when an explicit CancelProjectMeasurement request
+	// interrupted this pass. It is always false for a natural completion or a
+	// timeout, so the UI can distinguish a user-requested stop from either of those.
+	Cancelled  bool                   `json:"cancelled"`
+	Exclusions []ProjectExclusionRule `json:"exclusions"`
+	Warnings   []string               `json:"warnings"`
+	Message    string                 `json:"message"`
+	Boundary   string                 `json:"boundary"`
 }
 
 type Dashboard struct {

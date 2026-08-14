@@ -56,6 +56,7 @@ const projectExclusionInput = ref("");
 const projectMeasurement = ref<ProjectMeasurement | null>(null);
 const projectMeasuringPath = ref("");
 const projectMeasureError = ref("");
+const projectCancelling = ref(false);
 let elevationPoller: ReturnType<typeof setInterval> | undefined;
 
 const reclaimed = computed(() => scenario.value?.verification.reclaimedActual.bytes ?? 0);
@@ -179,12 +180,26 @@ async function measureProject(projectPath: string) {
   projectMeasuringPath.value = projectPath;
   projectMeasureError.value = "";
   projectMeasurement.value = null;
+  projectCancelling.value = false;
   try {
     projectMeasurement.value = await backend.measureProjectStorage(projectPath, projectExclusions.value);
   } catch (cause) {
     projectMeasureError.value = `Project measurement failed: ${String(cause)}`;
   } finally {
     projectMeasuringPath.value = "";
+    projectCancelling.value = false;
+  }
+}
+
+async function cancelProjectMeasurement() {
+  if (!projectMeasuringPath.value || projectCancelling.value) return;
+  projectCancelling.value = true;
+  try {
+    await backend.cancelProjectMeasurement();
+  } catch (cause) {
+    // The measurement call above still resolves with a partial result or an error;
+    // a failed cancel request itself is not fatal to the pending measurement.
+    projectMeasureError.value = `Cancel request failed: ${String(cause)}`;
   }
 }
 
@@ -194,7 +209,8 @@ function measuredValue(measurement: Measurement) {
 
 // A count is described by why it is not authoritative, so a deliberate exclusion is
 // never presented as the same thing as a failed read or an exhausted budget.
-function countLabel(scope: { complete: boolean; truncated: boolean; skipped?: ProjectSkippedPath[] }) {
+function countLabel(scope: { complete: boolean; truncated: boolean; cancelled?: boolean; skipped?: ProjectSkippedPath[] }) {
+  if (scope.cancelled) return "Cancelled, partial";
   if (scope.truncated) return "Partial count";
   if (scope.complete) return "Full count";
   const skipped = scope.skipped ?? [];
@@ -207,6 +223,7 @@ function projectCountLabel(measurement: ProjectMeasurement) {
   return countLabel({
     complete: measurement.complete,
     truncated: measurement.truncated,
+    cancelled: measurement.cancelled,
     skipped: measurement.artifacts.flatMap((artifact) => artifact.skipped),
   });
 }
@@ -702,12 +719,19 @@ function availabilityMessage(providerID: string) {
                 <code v-for="marker in project.markers" :key="marker">{{ marker }}</code>
               </div>
               <p v-if="project.artifacts.length === 0" class="muted">No allow-listed generated directory is claimed by this project's markers.</p>
-              <button
-                v-else
-                class="secondary project-measure-button"
-                :disabled="Boolean(projectMeasuringPath) || projectLoading"
-                @click="measureProject(project.path)"
-              >{{ projectMeasuringPath === project.path ? "Measuring…" : "Measure logical bytes" }}</button>
+              <div v-else class="project-measure-actions">
+                <button
+                  class="secondary project-measure-button"
+                  :disabled="Boolean(projectMeasuringPath) || projectLoading"
+                  @click="measureProject(project.path)"
+                >{{ projectMeasuringPath === project.path ? "Measuring…" : "Measure logical bytes" }}</button>
+                <button
+                  v-if="projectMeasuringPath === project.path"
+                  class="secondary project-cancel-button"
+                  :disabled="projectCancelling"
+                  @click="cancelProjectMeasurement"
+                >{{ projectCancelling ? "Cancelling…" : "Cancel measurement" }}</button>
+              </div>
               <ul v-if="project.artifacts.length" class="artifact-list">
                 <li v-for="artifact in project.artifacts" :key="artifact.path">
                   <div class="artifact-title">
@@ -745,7 +769,7 @@ function availabilityMessage(providerID: string) {
 
           <p v-if="projectMeasureError" class="error" role="alert">{{ projectMeasureError }}</p>
 
-          <p v-if="projectMeasuringPath" class="muted provider-loading" role="status" aria-live="polite">Counting exact logical bytes; this can take a while on a large dependency tree.</p>
+          <p v-if="projectMeasuringPath" class="muted provider-loading" role="status" aria-live="polite">{{ projectCancelling ? "Cancelling; the partial count gathered so far will still be shown." : "Counting exact logical bytes; this can take a while on a large dependency tree. Use Cancel measurement above to stop early." }}</p>
 
           <section v-if="projectMeasurement" class="panel project-measurement" aria-labelledby="project-measurement-title" role="status" aria-live="polite">
             <div class="docker-subsection-heading">
@@ -753,7 +777,7 @@ function availabilityMessage(providerID: string) {
                 <p class="eyebrow">{{ projectMeasurement.relativePath === "." ? "approved root" : projectMeasurement.relativePath }}</p>
                 <h3 id="project-measurement-title">Measured logical bytes for {{ projectMeasurement.name }}</h3>
               </div>
-              <span :class="projectMeasurementAuthoritative ? 'readonly-tag' : 'review-tag'">{{ projectCountLabel(projectMeasurement) }}</span>
+              <span :class="projectMeasurementAuthoritative ? 'readonly-tag' : 'review-tag'" :title="projectMeasurement.cancelled ? 'Stopped by an explicit Cancel measurement request' : ''">{{ projectCountLabel(projectMeasurement) }}</span>
             </div>
             <div class="artifact-metrics">
               <span><small>Project total (logical)</small><b>{{ measuredValue(projectMeasurement.total) }}</b></span>

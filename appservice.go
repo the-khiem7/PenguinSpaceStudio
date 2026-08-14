@@ -43,6 +43,8 @@ type AppService struct {
 	wslInspector    *wslinventory.Inspector
 	projectInspect  *projectinventory.Inspector
 	projectMu       sync.Mutex
+	projectCancelMu sync.Mutex
+	projectCancel   *projectinventory.CancelSignal
 	providerMu      sync.Mutex
 	providers       map[string]core.Provider
 	providerOrder   []string
@@ -106,8 +108,8 @@ func (s *AppService) Close() error {
 func (s *AppService) Dashboard() core.Dashboard {
 	return core.Dashboard{
 		ApplicationName: "PenguinSpace",
-		Stage:           "M4.2 project storage measurement with exclusions",
-		SafetyMessage:   "Project artifacts are measured as exact logical bytes with recorded exclusions and safety skips; that value is not physical reclaim, and reclaim estimates, plans, and deletion remain unavailable.",
+		Stage:           "M4.3 project detail and measurement cancellation",
+		SafetyMessage:   "Project artifacts are measured as exact logical bytes with recorded exclusions and safety skips, and a running measurement can be cancelled explicitly; that value is not physical reclaim, and reclaim estimates, plans, and deletion remain unavailable.",
 	}
 }
 
@@ -160,7 +162,9 @@ func (s *AppService) DiscoverProjectStorage() (core.ProjectDiscovery, error) {
 // MeasureProjectStorage measures the claimed generated directories of one discovered
 // project as exact logical bytes. The project and its artifacts are re-derived from a
 // fresh discovery pass, exclusions are validated against the approved root, and no
-// path is created, modified, or removed.
+// path is created, modified, or removed. Only one measurement runs at a time; a
+// caller may call CancelProjectMeasurement while this call is in flight rather than
+// waiting for the fixed context timeout.
 func (s *AppService) MeasureProjectStorage(projectPath string, exclusions []string) (core.ProjectMeasurement, error) {
 	s.providerMu.Lock()
 	root := s.workspaceRoot
@@ -169,12 +173,39 @@ func (s *AppService) MeasureProjectStorage(projectPath string, exclusions []stri
 		return core.ProjectMeasurement{}, errors.New("approve a workspace root before measuring project storage")
 	}
 
+	// projectMu is held for the whole measurement, exactly as for discovery, so only
+	// one project-storage pass runs at a time. The cancel signal is tracked under a
+	// separate mutex so CancelProjectMeasurement can reach it without waiting for
+	// this call to return.
 	s.projectMu.Lock()
 	defer s.projectMu.Unlock()
 
-	ctx, cancel := context.WithTimeout(context.Background(), 120*time.Second)
-	defer cancel()
-	return s.projectInspect.MeasureProject(ctx, root, projectPath, exclusions)
+	cancel := &projectinventory.CancelSignal{}
+	s.projectCancelMu.Lock()
+	s.projectCancel = cancel
+	s.projectCancelMu.Unlock()
+	defer func() {
+		s.projectCancelMu.Lock()
+		s.projectCancel = nil
+		s.projectCancelMu.Unlock()
+	}()
+
+	ctx, timeoutCancel := context.WithTimeout(context.Background(), 120*time.Second)
+	defer timeoutCancel()
+	return s.projectInspect.MeasureProject(ctx, root, projectPath, exclusions, cancel)
+}
+
+// CancelProjectMeasurement requests a prompt stop of the currently running project
+// measurement, if any. It does not error when no measurement is in progress, since a
+// late cancel request racing a just-finished measurement is expected and harmless.
+func (s *AppService) CancelProjectMeasurement() bool {
+	s.projectCancelMu.Lock()
+	defer s.projectCancelMu.Unlock()
+	if s.projectCancel == nil {
+		return false
+	}
+	s.projectCancel.Cancel()
+	return true
 }
 
 func (s *AppService) DiscoverDeveloperProviders() []core.ProviderAvailability {

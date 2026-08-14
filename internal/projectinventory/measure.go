@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
+	"sync/atomic"
 
 	"github.com/the-khiem7/PenguinSpaceStudio/internal/core"
 	"github.com/the-khiem7/PenguinSpaceStudio/internal/providers/common"
@@ -21,11 +22,33 @@ const MeasurementBoundary = "Measured values are exact logical bytes of the regu
 // because a dependency tree is legitimately deeper than a project layout.
 const maxMeasuredDepth = 64
 
+// cancelCheckInterval bounds how many entries a cancel request can be delayed by
+// inside one very large directory listing.
+const cancelCheckInterval = 2000
+
+// CancelSignal is a single explicit stop request for one in-flight measurement. Its
+// zero value is never cancelled; only Cancel() flips it, and it is safe to poll and
+// call Cancel concurrently.
+type CancelSignal struct {
+	cancelled atomic.Bool
+}
+
+func (s *CancelSignal) Cancel() { s.cancelled.Store(true) }
+
+func (s *CancelSignal) cancelledNow() bool {
+	if s == nil {
+		return false
+	}
+	return s.cancelled.Load()
+}
+
 // MeasureProject measures the claimed generated directories of one project below the
 // approved root. The project and its artifacts are re-derived from a fresh discovery
-// pass, so a caller cannot supply an arbitrary path. Nothing is created, modified, or
-// removed.
-func (i *Inspector) MeasureProject(ctx context.Context, root, projectPath string, exclusions []string) (core.ProjectMeasurement, error) {
+// pass, so a caller cannot supply an arbitrary path. cancel may be nil; when supplied
+// and Cancel() is called mid-walk, the walk stops promptly and the partial result is
+// returned with Cancelled=true instead of an error, because a deliberate stop is not
+// a failure. Nothing is created, modified, or removed.
+func (i *Inspector) MeasureProject(ctx context.Context, root, projectPath string, exclusions []string, cancel *CancelSignal) (core.ProjectMeasurement, error) {
 	if strings.TrimSpace(projectPath) == "" {
 		return core.ProjectMeasurement{}, errors.New("a project path is required")
 	}
@@ -72,9 +95,14 @@ func (i *Inspector) MeasureProject(ctx context.Context, root, projectPath string
 		measurement.Truncated = true
 	}
 
-	state := &measureState{root: discovery.Root, rules: rules}
+	state := &measureState{root: discovery.Root, rules: rules, cancel: cancel}
 	unmeasured := 0
 	for _, artifact := range project.Artifacts {
+		if state.cancel.cancelledNow() {
+			state.cancelledDuringWalk = true
+			state.appendWarning("Measurement was cancelled before every claimed artifact could be counted.")
+			break
+		}
 		result := i.measureArtifact(ctx, state, artifact)
 		if !result.Complete {
 			measurement.Complete = false
@@ -99,6 +127,11 @@ func (i *Inspector) MeasureProject(ctx context.Context, root, projectPath string
 		measurement.Complete = false
 		measurement.Warnings = append(measurement.Warnings, fmt.Sprintf("%d artifact(s) have unknown bytes and were left out of the project total rather than counted as zero.", unmeasured))
 	}
+	if state.cancelledDuringWalk {
+		measurement.Cancelled = true
+		measurement.Complete = false
+		measurement.Truncated = true
+	}
 	for index, rule := range measurement.Exclusions {
 		if state.matched[rule.Rule] {
 			measurement.Exclusions[index].Matched = true
@@ -112,11 +145,13 @@ func (i *Inspector) MeasureProject(ctx context.Context, root, projectPath string
 }
 
 type measureState struct {
-	root     string
-	rules    []string
-	entries  int
-	matched  map[string]bool
-	warnings []string
+	root                string
+	rules               []string
+	entries             int
+	matched             map[string]bool
+	warnings            []string
+	cancel              *CancelSignal
+	cancelledDuringWalk bool
 }
 
 func (i *Inspector) measureArtifact(ctx context.Context, state *measureState, artifact core.ProjectArtifactObservation) core.ProjectArtifactMeasurement {
@@ -157,6 +192,16 @@ func (i *Inspector) measureDirectory(ctx context.Context, state *measureState, r
 	if result.Truncated {
 		return
 	}
+	// An explicit cancel is checked before the context deadline so a cancel that
+	// lands at the same instant as the fixed timeout is reported as a deliberate
+	// stop rather than as an unrelated deadline expiry.
+	if state.cancel.cancelledNow() {
+		result.Complete = false
+		result.Truncated = true
+		state.cancelledDuringWalk = true
+		state.appendWarning(fmt.Sprintf("Measurement of %s was cancelled and stopped promptly.", state.relative(directory)))
+		return
+	}
 	if err := ctx.Err(); err != nil {
 		result.Complete = false
 		result.Truncated = true
@@ -195,6 +240,17 @@ func (i *Inspector) measureDirectory(ctx context.Context, state *measureState, r
 			return
 		}
 		state.entries++
+		// Checked before the entry budget, not only at each directory boundary, so an
+		// explicit cancel that lands exactly at the budget is reported as a
+		// deliberate stop rather than as an unrelated budget exhaustion, and
+		// cancelling mid-listing of one very large directory still stops promptly.
+		if state.entries%cancelCheckInterval == 0 && state.cancel.cancelledNow() {
+			result.Complete = false
+			result.Truncated = true
+			state.cancelledDuringWalk = true
+			state.appendWarning(fmt.Sprintf("Measurement of %s was cancelled mid-listing and stopped promptly.", state.relative(directory)))
+			return
+		}
 		if state.entries > i.limits.MaxMeasuredEntries {
 			result.Complete = false
 			result.Truncated = true
@@ -400,7 +456,9 @@ func summarizeMeasurement(measurement *core.ProjectMeasurement) string {
 	if skipped > 0 {
 		message += fmt.Sprintf(" %d path(s) were skipped for safety and their bytes are unknown rather than zero.", skipped)
 	}
-	if measurement.Truncated {
+	if measurement.Cancelled {
+		message += " Measurement was cancelled; the reported bytes are a partial count gathered before the stop."
+	} else if measurement.Truncated {
 		message += " A measurement budget was reached, so the reported bytes are a partial count."
 	}
 	if !measurement.Complete {

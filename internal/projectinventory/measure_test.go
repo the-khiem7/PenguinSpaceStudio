@@ -2,6 +2,7 @@ package projectinventory
 
 import (
 	"context"
+	"fmt"
 	"io/fs"
 	"math"
 	"os"
@@ -52,7 +53,7 @@ func measurementFor(t *testing.T, measurement core.ProjectMeasurement, name stri
 func TestMeasureProjectCountsExactLogicalBytesOfClaimedArtifactsOnly(t *testing.T) {
 	root := nodeProjectFixture(t)
 
-	measurement, err := NewSystemInspector().MeasureProject(context.Background(), root, root, nil)
+	measurement, err := NewSystemInspector().MeasureProject(context.Background(), root, root, nil, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -82,7 +83,7 @@ func TestMeasureProjectCountsExactLogicalBytesOfClaimedArtifactsOnly(t *testing.
 func TestMeasureProjectAppliesExclusionsAndReportsThem(t *testing.T) {
 	root := nodeProjectFixture(t)
 
-	measurement, err := NewSystemInspector().MeasureProject(context.Background(), root, root, []string{"node_modules/pkg/nested"})
+	measurement, err := NewSystemInspector().MeasureProject(context.Background(), root, root, []string{"node_modules/pkg/nested"}, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -125,7 +126,7 @@ func TestMeasureProjectAppliesExclusionsAndReportsThem(t *testing.T) {
 func TestMeasureProjectExcludesAnEntireArtifact(t *testing.T) {
 	root := nodeProjectFixture(t)
 
-	measurement, err := NewSystemInspector().MeasureProject(context.Background(), root, root, []string{"dist"})
+	measurement, err := NewSystemInspector().MeasureProject(context.Background(), root, root, []string{"dist"}, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -153,7 +154,7 @@ func TestMeasureProjectExcludesAnEntireArtifact(t *testing.T) {
 func TestMeasureProjectMarksOverlappingExclusionAsMatched(t *testing.T) {
 	root := nodeProjectFixture(t)
 
-	measurement, err := NewSystemInspector().MeasureProject(context.Background(), root, root, []string{"node_modules", "node_modules/pkg/nested"})
+	measurement, err := NewSystemInspector().MeasureProject(context.Background(), root, root, []string{"node_modules", "node_modules/pkg/nested"}, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -174,10 +175,10 @@ func TestMeasureProjectRejectsExclusionThroughReparsePoint(t *testing.T) {
 		t.Skipf("symlink unsupported on this host: %v", err)
 	}
 
-	if _, err := NewSystemInspector().MeasureProject(context.Background(), root, root, []string{"dist/linked"}); err == nil {
+	if _, err := NewSystemInspector().MeasureProject(context.Background(), root, root, []string{"dist/linked"}, nil); err == nil {
 		t.Fatal("an exclusion naming a reparse point was accepted")
 	}
-	if _, err := NewSystemInspector().MeasureProject(context.Background(), root, root, []string{"dist/linked/inside"}); err == nil {
+	if _, err := NewSystemInspector().MeasureProject(context.Background(), root, root, []string{"dist/linked/inside"}, nil); err == nil {
 		t.Fatal("an exclusion passing through a reparse point was accepted")
 	}
 }
@@ -217,7 +218,7 @@ func TestMeasureProjectPrefersSafetySkipOverExclusion(t *testing.T) {
 	writeSizedFile(t, root, "dist/later/inside.bin", 3000)
 	reader := symlinkEntryReader{directory: filepath.Join(root, "dist"), name: "later"}
 
-	measurement, err := NewInspectorWithReader(Limits{}, reader).MeasureProject(context.Background(), root, root, []string{"dist/later"})
+	measurement, err := NewInspectorWithReader(Limits{}, reader).MeasureProject(context.Background(), root, root, []string{"dist/later"}, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -277,7 +278,7 @@ func TestMeasureProjectStopsOnByteOverflow(t *testing.T) {
 	root := nodeProjectFixture(t)
 	reader := hugeFileReader{directory: filepath.Join(root, "dist"), files: 3}
 
-	measurement, err := NewInspectorWithReader(Limits{}, reader).MeasureProject(context.Background(), root, root, nil)
+	measurement, err := NewInspectorWithReader(Limits{}, reader).MeasureProject(context.Background(), root, root, nil, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -307,7 +308,7 @@ func TestMeasureProjectCountsSparseFileLogicalSize(t *testing.T) {
 		t.Skipf("sparse truncate unsupported: %v", err)
 	}
 
-	measurement, err := NewSystemInspector().MeasureProject(context.Background(), root, root, nil)
+	measurement, err := NewSystemInspector().MeasureProject(context.Background(), root, root, nil, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -325,7 +326,7 @@ func TestMeasureProjectDistinguishesIncompleteDiscoveryFromUnknownProject(t *tes
 	writeFixture(t, root, []string{"one", "two"}, []string{"one/package.json", "two/package.json"})
 
 	bounded := NewInspector(Limits{MaxDirectories: 2})
-	_, err := bounded.MeasureProject(context.Background(), root, filepath.Join(root, "two"), nil)
+	_, err := bounded.MeasureProject(context.Background(), root, filepath.Join(root, "two"), nil, nil)
 	if err == nil {
 		t.Fatal("an incomplete discovery must not silently measure")
 	}
@@ -335,7 +336,7 @@ func TestMeasureProjectDistinguishesIncompleteDiscoveryFromUnknownProject(t *tes
 
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
-	if _, err := NewSystemInspector().MeasureProject(ctx, root, filepath.Join(root, "one"), nil); err == nil || !strings.Contains(err.Error(), "did not finish") {
+	if _, err := NewSystemInspector().MeasureProject(ctx, root, filepath.Join(root, "one"), nil, nil); err == nil || !strings.Contains(err.Error(), "did not finish") {
 		t.Fatalf("a cancelled discovery must be reported as such: %v", err)
 	}
 }
@@ -343,7 +344,7 @@ func TestMeasureProjectDistinguishesIncompleteDiscoveryFromUnknownProject(t *tes
 func TestMeasureProjectReportsUnmatchedExclusion(t *testing.T) {
 	root := nodeProjectFixture(t)
 
-	measurement, err := NewSystemInspector().MeasureProject(context.Background(), root, root, []string{"src"})
+	measurement, err := NewSystemInspector().MeasureProject(context.Background(), root, root, []string{"src"}, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -368,7 +369,7 @@ func TestMeasureProjectRejectsUnsafeExclusions(t *testing.T) {
 		"root-itself":     root,
 		"pattern":         "node_modules/*",
 	} {
-		if _, err := inspector.MeasureProject(context.Background(), root, root, []string{exclusion}); err == nil {
+		if _, err := inspector.MeasureProject(context.Background(), root, root, []string{exclusion}, nil); err == nil {
 			t.Fatalf("%s exclusion was accepted", name)
 		}
 	}
@@ -378,16 +379,16 @@ func TestMeasureProjectRejectsUnknownProjectPath(t *testing.T) {
 	root := nodeProjectFixture(t)
 	inspector := NewSystemInspector()
 
-	if _, err := inspector.MeasureProject(context.Background(), root, filepath.Join(root, "src"), nil); err == nil {
+	if _, err := inspector.MeasureProject(context.Background(), root, filepath.Join(root, "src"), nil, nil); err == nil {
 		t.Fatal("a directory without markers was accepted as a project")
 	}
-	if _, err := inspector.MeasureProject(context.Background(), root, filepath.Join(root, "node_modules"), nil); err == nil {
+	if _, err := inspector.MeasureProject(context.Background(), root, filepath.Join(root, "node_modules"), nil, nil); err == nil {
 		t.Fatal("a claimed artifact was accepted as a project")
 	}
-	if _, err := inspector.MeasureProject(context.Background(), root, "", nil); err == nil {
+	if _, err := inspector.MeasureProject(context.Background(), root, "", nil, nil); err == nil {
 		t.Fatal("an empty project path was accepted")
 	}
-	if _, err := inspector.MeasureProject(context.Background(), filepath.Join(root, "absent"), root, nil); err == nil {
+	if _, err := inspector.MeasureProject(context.Background(), filepath.Join(root, "absent"), root, nil, nil); err == nil {
 		t.Fatal("an unapproved root was accepted")
 	}
 }
@@ -400,7 +401,7 @@ func TestMeasureProjectDoesNotFollowReparsePoints(t *testing.T) {
 		t.Skipf("symlink unsupported on this host: %v", err)
 	}
 
-	measurement, err := NewSystemInspector().MeasureProject(context.Background(), root, root, nil)
+	measurement, err := NewSystemInspector().MeasureProject(context.Background(), root, root, nil, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -448,7 +449,7 @@ func TestMeasureProjectRecordsNonRegularEntry(t *testing.T) {
 	root := nodeProjectFixture(t)
 	reader := irregularEntryReader{directory: filepath.Join(root, "dist"), name: "device"}
 
-	measurement, err := NewInspectorWithReader(Limits{}, reader).MeasureProject(context.Background(), root, root, nil)
+	measurement, err := NewInspectorWithReader(Limits{}, reader).MeasureProject(context.Background(), root, root, nil, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -474,7 +475,7 @@ func TestMeasureProjectRecordsUnreadableDirectory(t *testing.T) {
 	root := nodeProjectFixture(t)
 	denied := filepath.Join(root, "node_modules", "pkg")
 
-	measurement, err := NewInspectorWithReader(Limits{}, deniedDirectoryReader{denied: denied}).MeasureProject(context.Background(), root, root, nil)
+	measurement, err := NewInspectorWithReader(Limits{}, deniedDirectoryReader{denied: denied}).MeasureProject(context.Background(), root, root, nil, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -502,7 +503,7 @@ func TestMeasureProjectRecordsUnreadableDirectory(t *testing.T) {
 func TestMeasureProjectEnforcesEntryBudget(t *testing.T) {
 	root := nodeProjectFixture(t)
 
-	measurement, err := NewInspector(Limits{MaxMeasuredEntries: 2}).MeasureProject(context.Background(), root, root, nil)
+	measurement, err := NewInspector(Limits{MaxMeasuredEntries: 2}).MeasureProject(context.Background(), root, root, nil, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -522,7 +523,7 @@ func TestMeasureProjectStopsOnCancelledContext(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
 
-	if _, err := NewSystemInspector().MeasureProject(ctx, root, root, nil); err == nil {
+	if _, err := NewSystemInspector().MeasureProject(ctx, root, root, nil, nil); err == nil {
 		t.Fatal("a cancelled context must not produce a measurement")
 	}
 }
@@ -538,4 +539,114 @@ func TestIsWithinRejectsSharedNamePrefix(t *testing.T) {
 	if !isWithin(base, base) {
 		t.Fatal("the exact path must be treated as excluded")
 	}
+}
+
+// cancelAfterNReadsReader triggers cancel.Cancel() after the Nth ReadDir call to a
+// specific directory, imitating a caller cancelling mid-walk on a real filesystem.
+type cancelAfterNReadsReader struct {
+	directory string
+	after     int
+	cancel    *CancelSignal
+	reads     int
+}
+
+func (r *cancelAfterNReadsReader) ReadDir(name string) ([]fs.DirEntry, error) {
+	entries, err := os.ReadDir(name)
+	if err == nil && filepath.Clean(name) == filepath.Clean(r.directory) {
+		r.reads++
+		if r.reads == r.after {
+			r.cancel.Cancel()
+		}
+	}
+	return entries, err
+}
+
+func TestMeasureProjectStopsPromptlyOnCancelBetweenArtifacts(t *testing.T) {
+	root := nodeProjectFixture(t)
+	cancel := &CancelSignal{}
+	reader := &cancelAfterNReadsReader{directory: filepath.Join(root, "node_modules"), after: 1, cancel: cancel}
+
+	measurement, err := NewInspectorWithReader(Limits{}, reader).MeasureProject(context.Background(), root, root, nil, cancel)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !measurement.Cancelled {
+		t.Fatalf("expected the measurement to report cancellation: %+v", measurement)
+	}
+	if measurement.Complete || !measurement.Truncated {
+		t.Fatalf("a cancelled measurement must not be complete: %+v", measurement)
+	}
+	dist := measurementFor(t, measurement, "dist")
+	if dist.Measured.Bytes != 8000 {
+		t.Fatalf("an artifact fully measured before the cancel must keep its exact bytes: %+v", dist.Measured)
+	}
+	if !strings.Contains(measurement.Message, "cancelled") {
+		t.Fatalf("cancellation must be disclosed in the message: %q", measurement.Message)
+	}
+}
+
+func TestMeasureProjectStopsPromptlyOnCancelMidDirectory(t *testing.T) {
+	root := t.TempDir()
+	writeFixture(t, root, nil, []string{"package.json"})
+	for index := 0; index < 5; index++ {
+		writeSizedFile(t, root, fmt.Sprintf("dist/f%d.bin", index), 1000)
+	}
+	cancel := &CancelSignal{}
+	cancel.Cancel() // Already cancelled before the walk starts.
+
+	measurement, err := NewSystemInspector().MeasureProject(context.Background(), root, root, nil, cancel)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !measurement.Cancelled {
+		t.Fatalf("a pre-cancelled signal must stop before any artifact is measured: %+v", measurement)
+	}
+	if measurement.Complete {
+		t.Fatal("a pre-cancelled measurement must not be complete")
+	}
+	if len(measurement.Artifacts) != 0 {
+		t.Fatalf("a signal cancelled before the walk starts must measure nothing: %+v", measurement.Artifacts)
+	}
+	if measurement.Total.Kind != core.MeasurementMeasuredLogical || measurement.Total.Bytes != 0 {
+		t.Fatalf("an empty artifact list sums to zero measured bytes: %+v", measurement.Total)
+	}
+}
+
+func TestMeasureProjectNilCancelSignalNeverCancels(t *testing.T) {
+	root := nodeProjectFixture(t)
+
+	measurement, err := NewSystemInspector().MeasureProject(context.Background(), root, root, nil, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if measurement.Cancelled || !measurement.Complete {
+		t.Fatalf("a nil cancel signal must never cancel a measurement: %+v", measurement)
+	}
+}
+
+func TestMeasureProjectDoesNotReportCancelledOnNaturalTimeout(t *testing.T) {
+	root := nodeProjectFixture(t)
+	ctx, cancel := context.WithTimeout(context.Background(), time.Nanosecond)
+	defer cancel()
+	time.Sleep(time.Millisecond)
+
+	_, err := NewSystemInspector().MeasureProject(ctx, root, root, nil, nil)
+	if err == nil {
+		t.Fatal("a natural context timeout during discovery must surface as an error, not a silent cancelled result")
+	}
+}
+
+func TestCancelSignalIsSafeForConcurrentUse(t *testing.T) {
+	signal := &CancelSignal{}
+	done := make(chan struct{})
+	go func() {
+		for i := 0; i < 1000; i++ {
+			_ = signal.cancelledNow()
+		}
+		close(done)
+	}()
+	for i := 0; i < 1000; i++ {
+		signal.Cancel()
+	}
+	<-done
 }

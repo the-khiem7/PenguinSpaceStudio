@@ -217,3 +217,7 @@ button:disabled { opacity: .55; cursor: wait; }
 .measurement-skip-list strong, .exclusion-list code { color: #f0c98a; overflow-wrap: anywhere; }
 .measurement-skip-list span, .exclusion-list span { color: #b5a68f; line-height: 1.45; }
 .measurement-boundary { color: #9fe3d5; line-height: 1.45; }
+
+.project-measure-actions { display: flex; gap: 10px; margin: 16px 0 0; flex-wrap: wrap; }
+.project-measure-actions .project-measure-button, .project-measure-actions .project-cancel-button { margin: 0; }
+.project-cancel-button { color: #f0c98a; border-color: #4a3a26; }

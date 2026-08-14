@@ -243,6 +243,7 @@ export type ProjectMeasurement = {
   reclaimable: Measurement;
   complete: boolean;
   truncated: boolean;
+  cancelled: boolean;
   exclusions: ProjectExclusionRule[];
   warnings: string[] | null;
   message: string;
@@ -288,6 +289,7 @@ export const backend = {
   discoverProjectStorage: (): Promise<ProjectDiscovery> => AppService.DiscoverProjectStorage() as Promise<ProjectDiscovery>,
   measureProjectStorage: (projectPath: string, exclusions: string[]): Promise<ProjectMeasurement> =>
     AppService.MeasureProjectStorage(projectPath, exclusions) as Promise<ProjectMeasurement>,
+  cancelProjectMeasurement: (): Promise<boolean> => AppService.CancelProjectMeasurement() as Promise<boolean>,
   inspectDeveloperProvider: (providerId: string): Promise<ProviderInspection> => AppService.InspectDeveloperProvider(providerId) as Promise<ProviderInspection>,
   executeDeveloperProvider: (providerId: string): Promise<ProviderCleanupOutcome> => AppService.ExecuteDeveloperProvider(providerId, true) as Promise<ProviderCleanupOutcome>,
 };

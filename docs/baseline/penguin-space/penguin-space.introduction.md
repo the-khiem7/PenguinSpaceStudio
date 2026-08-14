@@ -4,7 +4,7 @@ pack: "penguin-space"
 document: "introduction"
 status: "active"
 updated: "2026-08-14"
-code_ref: "9a90be9 (M4.2 project storage measurement)"
+code_ref: "HEAD (M4.3 measurement cancellation)"
 ---
 
 # PenguinSpace baseline
@@ -126,6 +126,17 @@ It is not a generic PC cleaner or merely a GUI for cache-clearing commands. Its 
 - Bounds are fixed: a 400,000-entry budget, a 64-level measurement depth bound, per-artifact skip caps, and overflow checks on both per-artifact and per-project sums.
 - `docker compose run --rm verify` passed bindings (17 methods, 10 enums, 37 models), Vue type-check/build, gofmt, vet, all internal tests, and the Windows production cross-build. Fixtures cover exact counts, exclusion behaviour and reporting, unsafe and overlapping rules, safety-over-exclusion ordering, sparse-file logical size, non-regular and unreadable paths, the entry budget, byte overflow, cancellation, and incomplete-discovery attribution. A semantic review reported no Critical issue and its High findings were fixed before this checkpoint.
 - `out/penguinspace-v0.1.5.exe` (14,018,048 bytes; SHA-256 `6fb663910384769bf49d9a7bb8a90bcb1057e42cf46e496ed0a36a903af14190`) was produced without replacing any prior artifact and reproduced bit-for-bit by an independent container build. It has not been launched, so Windows visual acceptance of measurement remains open, and M4.3 is not authorized by this checkpoint.
+
+## Save checkpoint — M4.3 measurement cancellation
+
+**Code reference:** this M4.3 cancellation phase commit (the pack is re-pointed to its SHA immediately after the commit).
+
+- `MeasureProject` accepts an optional cancel signal. Cancelling from another goroutine stops the walk before the next directory descent or within 2,000 entries inside one large listing, and the check runs before the deadline and budget checks so a simultaneous cancel is never misreported as a timeout or a budget exhaustion.
+- A cancelled measurement returns `Cancelled: true` with no error and both `Complete` and `Truncated` false; bytes gathered before the stop are exact, and anything never read stays `unavailable`.
+- `AppService` serializes measurement and tracks the active cancel signal under a separate mutex so `CancelProjectMeasurement` never blocks on the in-flight call and never reaches a stale signal from a just-finished measurement.
+- Vue adds **Cancel measurement** beside the measure control and a distinct **Cancelled, partial** label.
+- `docker compose run --rm verify` passed bindings (18 methods, 10 enums, 37 models), Vue type-check/build, gofmt, vet, and all internal tests; cancellation fixtures passed under `-race`. A semantic review reported no High or Critical issue; its Medium tie-break findings and Low dead-code findings were fixed before this checkpoint.
+- Project detail and the last-used heuristic decision remain open for M4.3. No filesystem path was created, modified, or removed, and this change has not been exercised through the Windows UI.
 
 ## Storage model
 

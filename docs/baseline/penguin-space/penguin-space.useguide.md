@@ -4,7 +4,7 @@ pack: "penguin-space"
 document: "useguide"
 status: "draft"
 updated: "2026-08-14"
-code_ref: "9a90be9 (M4.2 project storage measurement)"
+code_ref: "HEAD (M4.3 measurement cancellation)"
 ---
 
 # Intended product interaction contract
@@ -78,6 +78,8 @@ Each project card with at least one claimed artifact exposes **Measure logical b
 A result shows the project total and each artifact's logical bytes, file and directory counts, and **Reclaimable** as **Unavailable**. A count is labelled **Full count** only when nothing was excluded, skipped, or truncated; otherwise it reads **Excluded scope** when only rules reduced it, **Incomplete count** when a path could not be read or was not a regular file, or **Partial count** when a budget or depth bound stopped the walk. An artifact that was excluded, or whose own directory could not be read, shows **Unavailable** rather than `0 B`, because its bytes are unknown rather than zero, and it is left out of the project total with a warning.
 
 The boundary statement is displayed with every result: measured values are logical bytes counted once per path, not physical host reclaim, because hardlinks, sparse files, and cluster size break that equivalence. There is no plan, confirmation, cleanup, or delete control on this surface in M4.2.
+
+While a measurement is running, **Cancel measurement** appears beside **Measure logical bytes**. Selecting it does not error and does not discard progress: the result still appears with every byte value counted before the stop, labelled **Cancelled, partial** so it reads differently from a budget-truncated **Partial count** or a **Full count**. There is no need to wait for the fixed measurement timeout to stop a long-running count.
 
 ## Scan-to-clean flow
 
