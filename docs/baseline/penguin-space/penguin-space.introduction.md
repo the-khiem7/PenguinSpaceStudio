@@ -4,7 +4,7 @@ pack: "penguin-space"
 document: "introduction"
 status: "active"
 updated: "2026-08-14"
-code_ref: "1ce9da1 (M4.3 measurement cancellation)"
+code_ref: "2cb0989 (M4.3 Last modified implementation)"
 ---
 
 # PenguinSpace baseline
@@ -147,6 +147,16 @@ It is not a generic PC cleaner or merely a GUI for cache-clearing commands. Its 
 - The value must always be shown with a disclosure that it reflects modification, not reading or use, and it must never drive sorting, ranking, "abandoned" labeling, preselection, or any cleanup plan.
 - A tool-log-derived usage signal and an in-app "last inspected" signal are explicitly deferred, each pending its own decision record.
 - This is a documentation-only decision; no code changed. Project detail implementation, which will consume this decision, remains open for M4.3.
+
+## Save checkpoint — M4.3 Last modified implementation
+
+**Code reference:** `2cb0989` (`feat(projects): show Last modified time per decided heuristic`).
+
+- `LastModified` is added to project and artifact observations in both discovery and measurement, sourced only from stat metadata already obtained during the existing walk; measurement carries the value over rather than re-deriving it.
+- `TimeObservation.Value` is a pointer so an unavailable observation's JSON omits the field entirely rather than serializing a zero date that would render as a real, wrong value.
+- The fixed modification-not-usage disclosure sentence accompanies every rendering of the value in Vue; nothing sorts, ranks, badges, or preselects on it, honoring the decision above.
+- `docker compose run --rm verify` passed bindings (18 methods, 10 enums, 38 models), Vue type-check/build, gofmt, vet, and all internal tests. A semantic review found no Critical issue; its High and Medium findings were fixed before this checkpoint.
+- No filesystem path was created, modified, or removed, and this has not been exercised through the Windows UI. Project detail remains the one open part of M4.3.
 
 ## Storage model
 

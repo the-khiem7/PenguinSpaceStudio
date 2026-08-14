@@ -50,6 +50,23 @@ func measurementFor(t *testing.T, measurement core.ProjectMeasurement, name stri
 	return core.ProjectArtifactMeasurement{}
 }
 
+func TestMeasureProjectCarriesOverLastModifiedFromDiscovery(t *testing.T) {
+	root := nodeProjectFixture(t)
+	stamp := time.Date(2023, 6, 1, 12, 0, 0, 0, time.UTC)
+	if err := os.Chtimes(filepath.Join(root, "dist"), stamp, stamp); err != nil {
+		t.Fatal(err)
+	}
+
+	measurement, err := NewSystemInspector().MeasureProject(context.Background(), root, root, nil, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	dist := measurementFor(t, measurement, "dist")
+	if !dist.LastModified.Available || dist.LastModified.Value == nil || !dist.LastModified.Value.Equal(stamp) {
+		t.Fatalf("expected the discovery-observed mtime to carry over unchanged: %+v", dist.LastModified)
+	}
+}
+
 func TestMeasureProjectCountsExactLogicalBytesOfClaimedArtifactsOnly(t *testing.T) {
 	root := nodeProjectFixture(t)
 

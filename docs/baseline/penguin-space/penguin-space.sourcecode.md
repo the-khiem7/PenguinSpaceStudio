@@ -4,7 +4,7 @@ pack: "penguin-space"
 document: "sourcecode"
 status: "active"
 updated: "2026-08-14"
-code_ref: "1ce9da1 (M4.3 measurement cancellation)"
+code_ref: "2cb0989 (M4.3 Last modified implementation)"
 ---
 
 # Architecture and implementation
@@ -148,7 +148,15 @@ Honesty rules govern the numbers. An excluded artifact, and an artifact whose ow
 
 A cancelled measurement sets `Cancelled: true` on `core.ProjectMeasurement` and returns no error, because a deliberate stop is not a failure; `Complete` and `Truncated` are both false. Bytes counted before the stop remain exact, and an artifact whose root directory was never reached still reports `unavailable` rather than a measured zero, following the same rule as an excluded or unreadable artifact.
 
-`AppService` holds `projectMu` for the whole measurement call, exactly as for discovery, and tracks the active `CancelSignal` under a separate `projectCancelMu` so `CancelProjectMeasurement` can reach it without waiting for the in-flight call to return. The tracked signal is created before the call and cleared, under the same mutex, only when the call returns, so a cancel request cannot land on a stale signal from an already-finished measurement or on the next one that starts immediately after. `CancelProjectMeasurement` is a harmless no-op returning `false` when nothing is running. Vue exposes **Cancel measurement** beside the measure control while a measurement is in flight, disables it while a cancel is pending, and labels a cancelled result **Cancelled, partial**, distinct from **Partial count** and **Full count**, so the 120-second context timeout is no longer the only way to stop a long measurement. The Vue **Projects** surface renders projects, markers, ecosystems, claimed artifacts with **Unavailable** sizes, and the recorded skip list. Its status badge is authoritative only when the snapshot is approved, complete, and untruncated, and its zero-project message refuses to describe an incomplete snapshot as an empty root. No inspect, review, confirm, plan, or delete control exists on this surface.
+`AppService` holds `projectMu` for the whole measurement call, exactly as for discovery, and tracks the active `CancelSignal` under a separate `projectCancelMu` so `CancelProjectMeasurement` can reach it without waiting for the in-flight call to return. The tracked signal is created before the call and cleared, under the same mutex, only when the call returns, so a cancel request cannot land on a stale signal from an already-finished measurement or on the next one that starts immediately after. `CancelProjectMeasurement` is a harmless no-op returning `false` when nothing is running. Vue exposes **Cancel measurement** beside the measure control while a measurement is in flight, disables it while a cancel is pending, and labels a cancelled result **Cancelled, partial**, distinct from **Partial count** and **Full count**, so the 120-second context timeout is no longer the only way to stop a long measurement.
+
+## M4.3 Last modified
+
+`core.TimeObservation` reports a timestamp only when `Available` is true; `Value` is `*time.Time` so JSON `omitempty` genuinely omits the field for an unavailable observation instead of serializing `0001-01-01T00:00:00Z`, which would render as a real, wrong date on any consumer that checked `value` before `available`. `ProjectObservation`, `ProjectArtifactObservation`, and `ProjectArtifactMeasurement` all carry a `LastModified` field of this type.
+
+Discovery sources the project root's value from the `os.Lstat` result it already obtains to revalidate the directory before reading it, and each claimed artifact's value from `fs.DirEntry.Info()` on the same directory-listing entry already read to detect and classify it. On Windows, Go's `ReadDir` retains this metadata from the underlying enumeration, so no additional filesystem call is introduced; on other platforms, `DirEntry.Info()` may cost one bounded, non-recursive `Lstat` per claimed artifact, never a scan into the artifact's contents. A reparse-point candidate is filtered out of the claimed-artifact list entirely before any `LastModified` is derived, so a followed symbolic link can never produce a value. `MeasureProject` copies the discovery-observed value onto its `ProjectArtifactMeasurement` unchanged; it is never re-derived from a second stat.
+
+This implements the decided last-used heuristic: no access-time signal exists anywhere in the codebase, the field means modification only, Vue attaches a fixed disclosure sentence to every rendering of the value, and nothing sorts, ranks, badges, or preselects on it. The Vue **Projects** surface renders projects, markers, ecosystems, claimed artifacts with **Unavailable** sizes, and the recorded skip list. Its status badge is authoritative only when the snapshot is approved, complete, and untruncated, and its zero-project message refuses to describe an incomplete snapshot as an empty root. No inspect, review, confirm, plan, or delete control exists on this surface.
 
 ## Required core models
 

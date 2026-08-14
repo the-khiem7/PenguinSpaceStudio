@@ -231,6 +231,7 @@ func (i *Inspector) walk(ctx context.Context, state *walkState, directory string
 			RelativePath: state.relative(directory),
 			Ecosystems:   sortedEcosystems(ecosystems),
 			Markers:      markers,
+			LastModified: lastModifiedOf(info),
 			Artifacts:    collectArtifacts(state, directory, entries, ecosystems),
 		})
 	}
@@ -305,6 +306,14 @@ func collectArtifacts(state *walkState, directory string, entries []fs.DirEntry,
 			continue
 		}
 		path := filepath.Join(directory, entry.Name())
+		// entry.Info() reuses the enumeration metadata Go's Windows ReadDir
+		// implementation already retains, so it adds no additional filesystem call
+		// there; on other platforms it may cost one bounded, non-recursive Lstat.
+		info, infoErr := entry.Info()
+		observation := core.TimeObservation{}
+		if infoErr == nil && info.Mode()&(fs.ModeSymlink|fs.ModeIrregular) == 0 {
+			observation = lastModifiedOf(info)
+		}
 		artifacts = append(artifacts, core.ProjectArtifactObservation{
 			Name:         entry.Name(),
 			Path:         path,
@@ -314,10 +323,27 @@ func collectArtifacts(state *walkState, directory string, entries []fs.DirEntry,
 			Risk:         core.RiskReview,
 			RecoveryCost: rule.recovery,
 			Measured:     core.Measurement{Kind: core.MeasurementUnavailable},
+			LastModified: observation,
 			Boundary:     rule.boundary,
 		})
 	}
 	return artifacts
+}
+
+// lastModifiedOf reports the decided (2026-08-14) Last modified signal: the
+// directory's own ModTime from an already-obtained os.FileInfo. On Windows, the
+// directory-listing metadata Go retains from the enumeration already carries this
+// value, so no additional stat call is introduced there; other platforms may incur
+// one extra Lstat per claimed artifact, which is bounded and not recursive. It is
+// modification time only; access time is never reported because NTFS disables
+// last-access-time updates by default and PenguinSpace does not change that
+// system-wide, rebooted setting.
+func lastModifiedOf(info os.FileInfo) core.TimeObservation {
+	if info == nil {
+		return core.TimeObservation{}
+	}
+	modTime := info.ModTime().UTC()
+	return core.TimeObservation{Value: &modTime, Available: true}
 }
 
 func claimRule(name string, ecosystems map[core.ProjectEcosystem]struct{}) (artifactRule, bool) {

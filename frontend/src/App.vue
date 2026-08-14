@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref } from "vue";
-import { backend, ElevationProbeMode, type DockerAwareness, type DockerNetworkRemovalOutcome, type DockerNetworkRemovalPlan, type DockerScopedResource, type ElevationStatus, type Measurement, type MeasurementKind, type ProjectDiscovery, type ProjectMeasurement, type ProjectSkipKind, type ProjectSkippedPath, type ProviderAvailability, type Scenario, type WSLAwareness } from "./backend";
+import { backend, ElevationProbeMode, type DockerAwareness, type DockerNetworkRemovalOutcome, type DockerNetworkRemovalPlan, type DockerScopedResource, type ElevationStatus, type Measurement, type MeasurementKind, type ProjectDiscovery, type ProjectMeasurement, type ProjectSkipKind, type ProjectSkippedPath, type ProviderAvailability, type TimeObservation, type Scenario, type WSLAwareness } from "./backend";
 import ProviderCard from "./components/ProviderCard.vue";
 
 type ProviderDefinition = {
@@ -205,6 +205,19 @@ async function cancelProjectMeasurement() {
 
 function measuredValue(measurement: Measurement) {
   return measurement.kind === "measured-logical" ? formatBytes(measurement.bytes) : "Unavailable";
+}
+
+// Decided 2026-08-14: this is a modification-time-only signal. It is deliberately
+// never labelled "last used" or "last accessed", and it must never drive sorting,
+// ranking, "abandoned" classification, or preselection. This disclosure string must
+// accompany every rendering of the value, not only its first appearance.
+const lastModifiedDisclosure = "Last modified reflects when this directory's contents last changed, not when it was last read or used.";
+
+function lastModifiedValue(observation: TimeObservation) {
+  if (!observation.available || !observation.value) return "Unavailable";
+  const parsed = new Date(observation.value);
+  if (Number.isNaN(parsed.getTime())) return "Unavailable";
+  return parsed.toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" });
 }
 
 // A count is described by why it is not authoritative, so a deliberate exclusion is
@@ -718,6 +731,7 @@ function availabilityMessage(providerID: string) {
                 <span v-for="ecosystem in project.ecosystems" :key="ecosystem" class="ecosystem-tag">{{ ecosystem }}</span>
                 <code v-for="marker in project.markers" :key="marker">{{ marker }}</code>
               </div>
+              <p class="muted last-modified-note" :title="lastModifiedDisclosure">Last modified: {{ lastModifiedValue(project.lastModified) }}</p>
               <p v-if="project.artifacts.length === 0" class="muted">No allow-listed generated directory is claimed by this project's markers.</p>
               <div v-else class="project-measure-actions">
                 <button
@@ -742,6 +756,7 @@ function availabilityMessage(providerID: string) {
                     <span><small>Storage class</small><b>{{ artifact.storageClass }}</b></span>
                     <span><small>Claimed by</small><b>{{ artifact.ecosystem }}</b></span>
                     <span><small>Size</small><b>{{ formatObservedMeasurement(artifact.measured, "unavailable") }}</b></span>
+                    <span :title="lastModifiedDisclosure"><small>Last modified</small><b>{{ lastModifiedValue(artifact.lastModified) }}</b></span>
                   </div>
                   <small>{{ artifact.boundary }}</small>
                 </li>
@@ -795,6 +810,7 @@ function availabilityMessage(providerID: string) {
                   <span><small>Logical bytes</small><b>{{ measuredValue(artifact.measured) }}</b></span>
                   <span><small>Files · directories</small><b>{{ artifact.files }} · {{ artifact.directories }}</b></span>
                   <span><small>Reclaimable</small><b>{{ measuredValue(artifact.reclaimable) }}</b></span>
+                  <span :title="lastModifiedDisclosure"><small>Last modified</small><b>{{ lastModifiedValue(artifact.lastModified) }}</b></span>
                 </div>
                 <ul v-if="artifact.skipped.length" class="measurement-skip-list">
                   <li v-for="skip in artifact.skipped" :key="`${skip.kind}:${skip.relativePath}`">

@@ -325,6 +325,16 @@ const (
 	ProjectSkipNonRegular       ProjectSkipKind = "non-regular"
 )
 
+// TimeObservation reports a filesystem timestamp honestly: Value is present only
+// when Available is true. A pointer is used deliberately, not time.Time directly,
+// because encoding/json's omitempty never omits a non-empty struct value; an
+// unavailable observation must serialize with no "value" field at all rather than a
+// zero time that would render as a real, wrong date.
+type TimeObservation struct {
+	Value     *time.Time `json:"value,omitempty"`
+	Available bool       `json:"available"`
+}
+
 type ProjectArtifactObservation struct {
 	Name         string           `json:"name"`
 	Path         string           `json:"path"`
@@ -334,15 +344,23 @@ type ProjectArtifactObservation struct {
 	Risk         RiskLevel        `json:"risk"`
 	RecoveryCost RecoveryCost     `json:"recoveryCost"`
 	Measured     Measurement      `json:"measured"`
-	Boundary     string           `json:"boundary"`
+	// LastModified is the artifact root directory's own modification time, decided
+	// (2026-08-14) as the only trustworthy time signal on Windows. It means
+	// modification, not usage: it is never labelled "last used" and it must never
+	// drive sorting, ranking, "abandoned" classification, or preselection.
+	LastModified TimeObservation `json:"lastModified"`
+	Boundary     string          `json:"boundary"`
 }
 
 type ProjectObservation struct {
-	Name         string                       `json:"name"`
-	Path         string                       `json:"path"`
-	RelativePath string                       `json:"relativePath"`
-	Ecosystems   []ProjectEcosystem           `json:"ecosystems"`
-	Markers      []string                     `json:"markers"`
+	Name         string             `json:"name"`
+	Path         string             `json:"path"`
+	RelativePath string             `json:"relativePath"`
+	Ecosystems   []ProjectEcosystem `json:"ecosystems"`
+	Markers      []string           `json:"markers"`
+	// LastModified is the project root directory's own modification time. Same
+	// modification-not-usage rule as ProjectArtifactObservation.LastModified.
+	LastModified TimeObservation              `json:"lastModified"`
 	Artifacts    []ProjectArtifactObservation `json:"artifacts"`
 }
 
@@ -372,19 +390,22 @@ type ProjectExclusionRule struct {
 }
 
 type ProjectArtifactMeasurement struct {
-	Name         string               `json:"name"`
-	Path         string               `json:"path"`
-	RelativePath string               `json:"relativePath"`
-	Ecosystem    ProjectEcosystem     `json:"ecosystem"`
-	StorageClass StorageClass         `json:"storageClass"`
-	Risk         RiskLevel            `json:"risk"`
-	RecoveryCost RecoveryCost         `json:"recoveryCost"`
-	Measured     Measurement          `json:"measured"`
-	Reclaimable  Measurement          `json:"reclaimable"`
-	Files        uint64               `json:"files"`
-	Directories  uint64               `json:"directories"`
-	Complete     bool                 `json:"complete"`
-	Truncated    bool                 `json:"truncated"`
+	Name         string           `json:"name"`
+	Path         string           `json:"path"`
+	RelativePath string           `json:"relativePath"`
+	Ecosystem    ProjectEcosystem `json:"ecosystem"`
+	StorageClass StorageClass     `json:"storageClass"`
+	Risk         RiskLevel        `json:"risk"`
+	RecoveryCost RecoveryCost     `json:"recoveryCost"`
+	Measured     Measurement      `json:"measured"`
+	Reclaimable  Measurement      `json:"reclaimable"`
+	Files        uint64           `json:"files"`
+	Directories  uint64           `json:"directories"`
+	Complete     bool             `json:"complete"`
+	Truncated    bool             `json:"truncated"`
+	// LastModified carries over the same-named observation from discovery. Same
+	// modification-not-usage rule as ProjectArtifactObservation.LastModified.
+	LastModified TimeObservation      `json:"lastModified"`
 	Skipped      []ProjectSkippedPath `json:"skipped"`
 	Boundary     string               `json:"boundary"`
 }

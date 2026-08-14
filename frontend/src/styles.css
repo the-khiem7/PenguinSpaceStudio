@@ -186,12 +186,13 @@ button:disabled { opacity: .55; cursor: wait; }
 .project-card h3 { margin: 0; color: #f4f7fb; overflow-wrap: anywhere; }
 .project-tags { display: flex; flex-wrap: wrap; gap: 8px; margin: 14px 0 0; }
 .project-tags code { color: #9fe3d5; background: #142526; border-radius: 6px; padding: 4px 8px; font-size: .74rem; }
+.last-modified-note { margin: 10px 0 0; cursor: help; }
 .ecosystem-tag { border-radius: 999px; padding: 4px 10px; font-size: .72rem; color: #cbd6e6; background: #223049; }
 .artifact-list { list-style: none; display: grid; gap: 10px; margin: 16px 0 0; padding: 0; }
 .artifact-list li { display: grid; gap: 8px; padding: 12px; border: 1px solid #2c3648; border-radius: 8px; background: #151c29; }
 .artifact-title { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
 .artifact-title strong { color: #f4f7fb; overflow-wrap: anywhere; }
-.artifact-metrics { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+.artifact-metrics { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 10px; }
 .artifact-metrics span { min-width: 0; display: grid; gap: 4px; }
 .artifact-metrics small, .artifact-list li > small, .project-boundary p { color: #9eacc0; line-height: 1.45; }
 .artifact-metrics b { color: #f4f7fb; overflow-wrap: anywhere; font-size: .82rem; }

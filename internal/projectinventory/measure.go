@@ -169,6 +169,9 @@ func (i *Inspector) measureArtifact(ctx context.Context, state *measureState, ar
 		Measured:     core.Measurement{Kind: core.MeasurementMeasuredLogical},
 		Reclaimable:  core.Measurement{Kind: core.MeasurementUnavailable},
 		Complete:     true,
+		// The fresh discovery pass behind this measurement already read this value;
+		// it is carried over rather than re-derived from a second stat call.
+		LastModified: artifact.LastModified,
 		Skipped:      []core.ProjectSkippedPath{},
 		Boundary:     artifact.Boundary,
 	}

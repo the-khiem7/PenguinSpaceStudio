@@ -4,7 +4,7 @@ pack: "penguin-space"
 document: "useguide"
 status: "draft"
 updated: "2026-08-14"
-code_ref: "1ce9da1 (M4.3 measurement cancellation)"
+code_ref: "2cb0989 (M4.3 Last modified implementation)"
 ---
 
 # Intended product interaction contract
@@ -80,6 +80,8 @@ A result shows the project total and each artifact's logical bytes, file and dir
 The boundary statement is displayed with every result: measured values are logical bytes counted once per path, not physical host reclaim, because hardlinks, sparse files, and cluster size break that equivalence. There is no plan, confirmation, cleanup, or delete control on this surface in M4.2.
 
 While a measurement is running, **Cancel measurement** appears beside **Measure logical bytes**. Selecting it does not error and does not discard progress: the result still appears with every byte value counted before the stop, labelled **Cancelled, partial** so it reads differently from a budget-truncated **Partial count** or a **Full count**. There is no need to wait for the fixed measurement timeout to stop a long-running count.
+
+Each project card and each artifact, in both the discovery list and a measurement result, shows **Last modified** with the date the directory's own contents last changed. Hovering it always shows the same disclosure: it reflects modification, not reading or use. When the value is not available, it reads **Unavailable** rather than showing any date. This value never affects ordering, never appears as a badge, and is never used to suggest that a project is unused.
 
 ## Scan-to-clean flow
 

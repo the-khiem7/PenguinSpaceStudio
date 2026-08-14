@@ -2,11 +2,14 @@ package projectinventory
 
 import (
 	"context"
+	"encoding/json"
 	"io/fs"
 	"os"
 	"path/filepath"
 	"strconv"
+	"strings"
 	"testing"
+	"time"
 
 	"github.com/the-khiem7/PenguinSpaceStudio/internal/core"
 )
@@ -53,6 +56,78 @@ func skipKind(report core.ProjectDiscovery, relative string) (core.ProjectSkipKi
 		}
 	}
 	return "", false
+}
+
+func TestUnavailableLastModifiedOmitsValueFromJSON(t *testing.T) {
+	encoded, err := json.Marshal(core.TimeObservation{Available: false})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(string(encoded), "\"value\"") {
+		t.Fatalf("an unavailable observation must never serialize a value field: %s", encoded)
+	}
+	if string(encoded) != `{"available":false}` {
+		t.Fatalf("unexpected encoding: %s", encoded)
+	}
+}
+
+func TestDiscoverReportsLastModifiedAsDirectoryModTimeOnly(t *testing.T) {
+	root := t.TempDir()
+	writeFixture(t, root, []string{"dist"}, []string{"package.json"})
+	distPath := filepath.Join(root, "dist")
+
+	// Set the directory's own mtime to an exact known value and prove discovery
+	// reports exactly that value, not the current time and not a file inside it.
+	stamp := time.Date(2024, 3, 15, 8, 0, 0, 0, time.UTC)
+	if err := os.Chtimes(distPath, stamp, stamp); err != nil {
+		t.Fatal(err)
+	}
+
+	report := NewSystemInspector().Discover(context.Background(), root)
+	project, ok := projectByRelativePath(report, ".")
+	if !ok {
+		t.Fatal("project was not discovered")
+	}
+	if !project.LastModified.Available {
+		t.Fatalf("project LastModified must be available: %+v", project.LastModified)
+	}
+
+	var dist core.ProjectArtifactObservation
+	for _, artifact := range project.Artifacts {
+		if artifact.Name == "dist" {
+			dist = artifact
+		}
+	}
+	if dist.Name == "" {
+		t.Fatal("dist artifact was not reported")
+	}
+	if !dist.LastModified.Available {
+		t.Fatalf("artifact LastModified must be available: %+v", dist.LastModified)
+	}
+	if dist.LastModified.Value == nil || !dist.LastModified.Value.Equal(stamp) {
+		t.Fatalf("expected exact directory mtime %v, got %v", stamp, dist.LastModified.Value)
+	}
+}
+
+func TestDiscoverReportsUnavailableLastModifiedForReparseArtifact(t *testing.T) {
+	root := t.TempDir()
+	outside := t.TempDir()
+	writeFixture(t, root, nil, []string{"Cargo.toml"})
+	if err := os.Symlink(outside, filepath.Join(root, "target")); err != nil {
+		t.Skipf("symlink unsupported on this host: %v", err)
+	}
+
+	report := NewSystemInspector().Discover(context.Background(), root)
+	project, ok := projectByRelativePath(report, ".")
+	if !ok {
+		t.Fatal("project was not discovered")
+	}
+	if len(project.Artifacts) != 0 {
+		t.Fatalf("a reparse point must not be reported as a claimed artifact: %+v", project.Artifacts)
+	}
+	if kind, ok := skipKind(report, "target"); !ok || kind != core.ProjectSkipReparsePoint {
+		t.Fatalf("expected the reparse point to be recorded, got %q (present=%v)", kind, ok)
+	}
 }
 
 func TestDiscoverReportsMarkerBackedProjectsAndClaimedArtifacts(t *testing.T) {

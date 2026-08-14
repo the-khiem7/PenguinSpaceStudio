@@ -178,6 +178,12 @@ export type ProjectSkipKind =
 
 export type ProjectSkippedPath = { relativePath: string; kind: ProjectSkipKind; reason: string };
 
+// A modification-time-only signal, decided 2026-08-14: it is never "last used" or
+// "last accessed" because NTFS disables access-time updates by default. Available
+// is false whenever the value is not meaningful; render "Unavailable" in that case,
+// never a fallback date.
+export type TimeObservation = { value?: string; available: boolean };
+
 export type ProjectArtifactObservation = {
   name: string;
   path: string;
@@ -187,6 +193,7 @@ export type ProjectArtifactObservation = {
   risk: string;
   recoveryCost: string;
   measured: Measurement;
+  lastModified: TimeObservation;
   boundary: string;
 };
 
@@ -196,6 +203,7 @@ export type ProjectObservation = {
   relativePath: string;
   ecosystems: ProjectEcosystem[];
   markers: string[];
+  lastModified: TimeObservation;
   artifacts: ProjectArtifactObservation[];
 };
 
@@ -228,6 +236,7 @@ export type ProjectArtifactMeasurement = {
   directories: number;
   complete: boolean;
   truncated: boolean;
+  lastModified: TimeObservation;
   skipped: ProjectSkippedPath[];
   boundary: string;
 };
