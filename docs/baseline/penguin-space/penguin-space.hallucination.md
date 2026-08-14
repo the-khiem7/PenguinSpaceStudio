@@ -4,7 +4,7 @@ pack: "penguin-space"
 document: "hallucination"
 status: "active"
 updated: "2026-08-14"
-code_ref: "2cb0989 (M4.3 Last modified implementation)"
+code_ref: "f7189e1 (M4.3 project detail, M4.3 complete)"
 ---
 
 # Decisions, unknowns, and claim boundaries
@@ -33,7 +33,7 @@ code_ref: "2cb0989 (M4.3 Last modified implementation)"
 
 **Open questions and required evidence**
 
-- M4.3 measurement cancellation and the Last modified implementation of the last-used heuristic decision are both implemented and Docker-verified, but neither has been exercised through the Windows UI, so no runtime claim exists for cancel latency on a real large dependency tree, for the button's behaviour under Windows scheduling, or for the disclosure/label rendering. Project detail is the only open part of M4.3.
+- M4.3 is fully implemented and Docker-verified: measurement cancellation, the Last modified implementation of the last-used heuristic decision, and project detail. None of the three has been exercised through the Windows UI, so no runtime claim exists for cancel latency on a real large dependency tree, for the button's behaviour under Windows scheduling, for the disclosure/label rendering, or for the summary-card/detail-panel layout on a real screen. M4.4 remains unimplemented and unauthorized.
 - M4.2 measurement is implemented and Docker-verified with fixture evidence for exact counts, exclusion behaviour and reporting, rejected unsafe rules, safety-over-exclusion ordering, sparse-file logical size, non-regular and unreadable paths, the entry budget, byte overflow, cancellation, and incomplete-discovery attribution. It has not been exercised through the Windows UI, so no runtime claim exists for a real dependency tree, for measurement duration on a large artifact, or for NTFS-specific behaviour. A measured value is logical bytes only; it is not physical reclaim and not a reclaim estimate.
 - M4.1 discovery is runtime-confirmed on Windows against the real approved root `AgentMindStudio`: marker-backed projects, marker-claimed artifacts with unavailable sizes, an explicit no-claimed-artifact statement, a **Snapshot truncated** badge, the recorded `.git` and depth-bound skips, and no cleanup control. Its case-insensitive directory-boundary behavior and junction handling were not exercised by that run because the observed layout contained neither a differently cased boundary name nor a reparse point; both remain fixture-only evidence. Nothing in M4.1 evidences measurement, reclaimability, last-used state, or safe deletion of any project artifact.
 - M3.1 and M3.3 daemon-available and daemon-unavailable Windows behavior are runtime-confirmed. M3.5 exact-network semantics are implementation- and fake-runner-verified but have not removed a live disposable network through the Windows UI. M3.6 has Windows-native sparse/reparse fixture evidence but has not been exercised through the UI against installed WSL registrations/VHDX layouts. These gaps do not authorize broader Docker cleanup, WSL/VHDX mutation, or inference from labels, counts, paths, relationships, or disk-usage summaries.

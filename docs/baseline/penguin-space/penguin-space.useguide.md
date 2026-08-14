@@ -4,7 +4,7 @@ pack: "penguin-space"
 document: "useguide"
 status: "draft"
 updated: "2026-08-14"
-code_ref: "2cb0989 (M4.3 Last modified implementation)"
+code_ref: "f7189e1 (M4.3 project detail, M4.3 complete)"
 ---
 
 # Intended product interaction contract
@@ -71,15 +71,17 @@ The status badge reads **Snapshot complete** only when the root was approved, no
 
 ## M4.2 project storage measurement
 
-Each project card with at least one claimed artifact exposes **Measure logical bytes**. Measurement is a separate, explicit step: discovery alone never reads a byte.
+Each discovered project renders as a compact card: name, ecosystems, markers, **Last modified**, a claimed-artifact count, and a **View details** toggle. Selecting it opens one shared detail panel below the grid; selecting a different project or **Close** clears whatever measurement result or error the panel was showing, so nothing from one project can appear attributed to another.
 
-**Exclusions for the next measurement** takes one path per line, resolved against the approved root rather than the selected project. The backend rejects a pattern, a path outside the root, the root itself, and any path that runs through a reparse point. Rules are not saved; they apply to the next measurement only, and each one is listed with the result as either applied or as having matched nothing.
+Inside the detail panel, a project with at least one claimed artifact exposes its artifact list plus **Measure logical bytes**. Measurement is a separate, explicit step: discovery alone never reads a byte.
+
+**Exclusions for the next measurement** takes one path per line, resolved against the approved root rather than the open project. The backend rejects a pattern, a path outside the root, the root itself, and any path that runs through a reparse point. Rules are not saved; they apply to the next measurement only, and each one is listed with the result as either applied or as having matched nothing.
 
 A result shows the project total and each artifact's logical bytes, file and directory counts, and **Reclaimable** as **Unavailable**. A count is labelled **Full count** only when nothing was excluded, skipped, or truncated; otherwise it reads **Excluded scope** when only rules reduced it, **Incomplete count** when a path could not be read or was not a regular file, or **Partial count** when a budget or depth bound stopped the walk. An artifact that was excluded, or whose own directory could not be read, shows **Unavailable** rather than `0 B`, because its bytes are unknown rather than zero, and it is left out of the project total with a warning.
 
-The boundary statement is displayed with every result: measured values are logical bytes counted once per path, not physical host reclaim, because hardlinks, sparse files, and cluster size break that equivalence. There is no plan, confirmation, cleanup, or delete control on this surface in M4.2.
+The boundary statement is displayed with every result: measured values are logical bytes counted once per path, not physical host reclaim, because hardlinks, sparse files, and cluster size break that equivalence. There is no plan, confirmation, cleanup, or delete control on this surface in M4.2 or M4.3.
 
-While a measurement is running, **Cancel measurement** appears beside **Measure logical bytes**. Selecting it does not error and does not discard progress: the result still appears with every byte value counted before the stop, labelled **Cancelled, partial** so it reads differently from a budget-truncated **Partial count** or a **Full count**. There is no need to wait for the fixed measurement timeout to stop a long-running count.
+While a measurement is running, **Cancel measurement** appears beside **Measure logical bytes**. Selecting it does not error and does not discard progress: the result still appears with every byte value counted before the stop, labelled **Cancelled, partial** so it reads differently from a budget-truncated **Partial count** or a **Full count**. There is no need to wait for the fixed measurement timeout to stop a long-running count. Only one measurement runs at a time; opening a different project's detail panel while another project is still being measured shows a background-progress notice naming that project and keeps its Cancel control reachable, so a measurement never becomes unreachable just because its own panel was closed.
 
 Each project card and each artifact, in both the discovery list and a measurement result, shows **Last modified** with the date the directory's own contents last changed. Hovering it always shows the same disclosure: it reflects modification, not reading or use. When the value is not available, it reads **Unavailable** rather than showing any date. This value never affects ordering, never appears as a badge, and is never used to suggest that a project is unused.
 

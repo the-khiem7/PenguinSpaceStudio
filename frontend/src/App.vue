@@ -56,7 +56,11 @@ const projectExclusionInput = ref("");
 const projectMeasurement = ref<ProjectMeasurement | null>(null);
 const projectMeasuringPath = ref("");
 const projectMeasureError = ref("");
+// The path a pending/failed measurement belongs to, so switching the selected
+// project mid-flight cannot attribute A's error to B's now-visible detail panel.
+const projectMeasureErrorPath = ref("");
 const projectCancelling = ref(false);
+const selectedProjectPath = ref("");
 let elevationPoller: ReturnType<typeof setInterval> | undefined;
 
 const reclaimed = computed(() => scenario.value?.verification.reclaimedActual.bytes ?? 0);
@@ -137,13 +141,13 @@ async function refreshProjectDiscovery() {
   if (!workspaceRoot.value) {
     projectDiscovery.value = null;
     projectError.value = "";
+    closeProjectDetail();
     return;
   }
   projectLoading.value = true;
   projectError.value = "";
   projectDiscovery.value = null;
-  projectMeasurement.value = null;
-  projectMeasureError.value = "";
+  closeProjectDetail();
   try {
     projectDiscovery.value = await backend.discoverProjectStorage();
   } catch (cause) {
@@ -151,6 +155,28 @@ async function refreshProjectDiscovery() {
   } finally {
     projectLoading.value = false;
   }
+}
+
+const selectedProject = computed(() =>
+  projectDiscovery.value?.projects.find((project) => project.path === selectedProjectPath.value) ?? null,
+);
+
+// Selecting a project opens its detail view. A measurement result and its error are
+// scoped to whichever project produced them, so switching projects must not leave a
+// stale result attributed to the wrong one visible in the new detail view.
+function selectProject(path: string) {
+  if (selectedProjectPath.value === path) return;
+  selectedProjectPath.value = path;
+  projectMeasurement.value = null;
+  projectMeasureError.value = "";
+  projectMeasureErrorPath.value = "";
+}
+
+function closeProjectDetail() {
+  selectedProjectPath.value = "";
+  projectMeasurement.value = null;
+  projectMeasureError.value = "";
+  projectMeasureErrorPath.value = "";
 }
 
 function projectSkipLabel(kind: ProjectSkipKind) {
@@ -179,12 +205,18 @@ const projectMeasurementAuthoritative = computed(() =>
 async function measureProject(projectPath: string) {
   projectMeasuringPath.value = projectPath;
   projectMeasureError.value = "";
+  projectMeasureErrorPath.value = "";
   projectMeasurement.value = null;
   projectCancelling.value = false;
   try {
     projectMeasurement.value = await backend.measureProjectStorage(projectPath, projectExclusions.value);
   } catch (cause) {
+    // Tag the error with the project it belongs to. If the user switched the
+    // selected project while this call was in flight, the error must stay attached
+    // to projectPath so it never renders under a different, currently-visible
+    // project's detail panel.
     projectMeasureError.value = `Project measurement failed: ${String(cause)}`;
+    projectMeasureErrorPath.value = projectPath;
   } finally {
     projectMeasuringPath.value = "";
     projectCancelling.value = false;
@@ -193,13 +225,17 @@ async function measureProject(projectPath: string) {
 
 async function cancelProjectMeasurement() {
   if (!projectMeasuringPath.value || projectCancelling.value) return;
+  const target = projectMeasuringPath.value;
   projectCancelling.value = true;
   try {
     await backend.cancelProjectMeasurement();
   } catch (cause) {
     // The measurement call above still resolves with a partial result or an error;
-    // a failed cancel request itself is not fatal to the pending measurement.
+    // a failed cancel request itself is not fatal to the pending measurement. Tag it
+    // with the project being measured, same as measureProject's catch, so it cannot
+    // render under a different project's now-visible detail panel.
     projectMeasureError.value = `Cancel request failed: ${String(cause)}`;
+    projectMeasureErrorPath.value = target;
   }
 }
 
@@ -240,6 +276,11 @@ function projectCountLabel(measurement: ProjectMeasurement) {
     skipped: measurement.artifacts.flatMap((artifact) => artifact.skipped),
   });
 }
+
+const measuringProjectName = computed(() => {
+  if (!projectMeasuringPath.value || !projectDiscovery.value) return "";
+  return projectDiscovery.value.projects.find((project) => project.path === projectMeasuringPath.value)?.name ?? projectMeasuringPath.value;
+});
 
 const projectArtifactCount = computed(() =>
   (projectDiscovery.value?.projects ?? []).reduce((total, project) => total + project.artifacts.length, 0),
@@ -719,7 +760,12 @@ function availabilityMessage(providerID: string) {
 
           <p v-if="projectDiscovery.projects.length === 0" class="empty-state">{{ projectSnapshotAuthoritative ? "No marker-backed project was found below the approved root." : "No marker-backed project was reported, but this snapshot is incomplete, so the approved root cannot be presented as empty." }}</p>
           <div v-else class="project-grid">
-            <article v-for="project in projectDiscovery.projects" :key="project.path" class="panel project-card">
+            <article
+              v-for="project in projectDiscovery.projects"
+              :key="project.path"
+              class="panel project-card"
+              :class="{ selected: project.path === selectedProjectPath }"
+            >
               <header>
                 <div>
                   <span>{{ project.relativePath === "." ? "approved root" : project.relativePath }}</span>
@@ -732,104 +778,130 @@ function availabilityMessage(providerID: string) {
                 <code v-for="marker in project.markers" :key="marker">{{ marker }}</code>
               </div>
               <p class="muted last-modified-note" :title="lastModifiedDisclosure">Last modified: {{ lastModifiedValue(project.lastModified) }}</p>
-              <p v-if="project.artifacts.length === 0" class="muted">No allow-listed generated directory is claimed by this project's markers.</p>
-              <div v-else class="project-measure-actions">
-                <button
-                  class="secondary project-measure-button"
-                  :disabled="Boolean(projectMeasuringPath) || projectLoading"
-                  @click="measureProject(project.path)"
-                >{{ projectMeasuringPath === project.path ? "Measuring…" : "Measure logical bytes" }}</button>
-                <button
-                  v-if="projectMeasuringPath === project.path"
-                  class="secondary project-cancel-button"
-                  :disabled="projectCancelling"
-                  @click="cancelProjectMeasurement"
-                >{{ projectCancelling ? "Cancelling…" : "Cancel measurement" }}</button>
-              </div>
-              <ul v-if="project.artifacts.length" class="artifact-list">
-                <li v-for="artifact in project.artifacts" :key="artifact.path">
-                  <div class="artifact-title">
-                    <strong>{{ artifact.name }}</strong>
-                    <span class="review-tag">{{ artifact.risk }} · {{ artifact.recoveryCost }}</span>
-                  </div>
-                  <div class="artifact-metrics">
-                    <span><small>Storage class</small><b>{{ artifact.storageClass }}</b></span>
-                    <span><small>Claimed by</small><b>{{ artifact.ecosystem }}</b></span>
-                    <span><small>Size</small><b>{{ formatObservedMeasurement(artifact.measured, "unavailable") }}</b></span>
-                    <span :title="lastModifiedDisclosure"><small>Last modified</small><b>{{ lastModifiedValue(artifact.lastModified) }}</b></span>
-                  </div>
-                  <small>{{ artifact.boundary }}</small>
-                </li>
-              </ul>
+              <p class="muted">{{ project.artifacts.length === 0 ? "No allow-listed generated directory is claimed by this project's markers." : `${project.artifacts.length} claimed generated director${project.artifacts.length === 1 ? "y" : "ies"}` }}</p>
+              <button
+                class="secondary project-detail-button"
+                :disabled="project.path === selectedProjectPath"
+                @click="selectProject(project.path)"
+              >{{ project.path === selectedProjectPath ? "Viewing details" : "View details" }}</button>
             </article>
           </div>
 
-          <section class="panel measurement-scope" aria-labelledby="measurement-scope-title">
+          <section v-if="selectedProject" class="panel project-detail" aria-labelledby="project-detail-title">
             <div class="docker-subsection-heading">
               <div>
-                <p class="eyebrow">M4.2 · Measurement scope</p>
-                <h3 id="measurement-scope-title">Exclusions for the next measurement</h3>
+                <p class="eyebrow">Project detail · {{ selectedProject.relativePath === "." ? "approved root" : selectedProject.relativePath }}</p>
+                <h3 id="project-detail-title">{{ selectedProject.name }}</h3>
               </div>
-              <span class="readonly-tag">Not persisted</span>
+              <button class="secondary" @click="closeProjectDetail">Close</button>
             </div>
-            <p class="muted">One path per line, resolved against the <strong>approved root</strong>, not against the selected project. The backend validates every rule, rejects patterns, anything outside the root, and any path through a reparse point, then reports each rule with the result. An exclusion only removes bytes from the count; it can never re-include a path that a safety rule rejected.</p>
-            <textarea
-              v-model="projectExclusionInput"
-              aria-label="Exclusion paths, one per line"
-              placeholder="node_modules/.cache&#10;dist/reports"
-              rows="3"
-            ></textarea>
-            <p class="muted">{{ projectExclusions.length === 0 ? "No exclusion is applied; measurement will count every readable regular file." : `${projectExclusions.length} exclusion(s) will be sent with the next measurement.` }}</p>
-          </section>
+            <dl class="project-detail-summary">
+              <div><dt>Ecosystems</dt><dd>{{ selectedProject.ecosystems.length ? selectedProject.ecosystems.join(", ") : "None detected" }}</dd></div>
+              <div><dt>Markers</dt><dd><code v-for="marker in selectedProject.markers" :key="marker">{{ marker }}</code></dd></div>
+              <div :title="lastModifiedDisclosure"><dt>Last modified</dt><dd>{{ lastModifiedValue(selectedProject.lastModified) }}</dd></div>
+              <div><dt>Absolute path</dt><dd><code :title="selectedProject.path">{{ selectedProject.path }}</code></dd></div>
+            </dl>
 
-          <p v-if="projectMeasureError" class="error" role="alert">{{ projectMeasureError }}</p>
-
-          <p v-if="projectMeasuringPath" class="muted provider-loading" role="status" aria-live="polite">{{ projectCancelling ? "Cancelling; the partial count gathered so far will still be shown." : "Counting exact logical bytes; this can take a while on a large dependency tree. Use Cancel measurement above to stop early." }}</p>
-
-          <section v-if="projectMeasurement" class="panel project-measurement" aria-labelledby="project-measurement-title" role="status" aria-live="polite">
-            <div class="docker-subsection-heading">
-              <div>
-                <p class="eyebrow">{{ projectMeasurement.relativePath === "." ? "approved root" : projectMeasurement.relativePath }}</p>
-                <h3 id="project-measurement-title">Measured logical bytes for {{ projectMeasurement.name }}</h3>
-              </div>
-              <span :class="projectMeasurementAuthoritative ? 'readonly-tag' : 'review-tag'" :title="projectMeasurement.cancelled ? 'Stopped by an explicit Cancel measurement request' : ''">{{ projectCountLabel(projectMeasurement) }}</span>
-            </div>
-            <div class="artifact-metrics">
-              <span><small>Project total (logical)</small><b>{{ measuredValue(projectMeasurement.total) }}</b></span>
-              <span><small>Reclaimable</small><b>{{ measuredValue(projectMeasurement.reclaimable) }}</b></span>
-              <span><small>Artifacts measured</small><b>{{ projectMeasurement.artifacts.length }}</b></span>
-            </div>
-            <p class="muted">{{ projectMeasurement.message }}</p>
-            <ul class="artifact-list">
-              <li v-for="artifact in projectMeasurement.artifacts" :key="artifact.path">
+            <p v-if="selectedProject.artifacts.length === 0" class="empty-state">No allow-listed generated directory is claimed by this project's markers, so there is nothing to measure here.</p>
+            <ul v-else class="artifact-list">
+              <li v-for="artifact in selectedProject.artifacts" :key="artifact.path">
                 <div class="artifact-title">
                   <strong>{{ artifact.name }}</strong>
-                  <span :class="artifact.complete && !artifact.truncated ? 'readonly-tag' : 'review-tag'">{{ countLabel(artifact) }}</span>
+                  <span class="review-tag">{{ artifact.risk }} · {{ artifact.recoveryCost }}</span>
                 </div>
                 <div class="artifact-metrics">
-                  <span><small>Logical bytes</small><b>{{ measuredValue(artifact.measured) }}</b></span>
-                  <span><small>Files · directories</small><b>{{ artifact.files }} · {{ artifact.directories }}</b></span>
-                  <span><small>Reclaimable</small><b>{{ measuredValue(artifact.reclaimable) }}</b></span>
+                  <span><small>Storage class</small><b>{{ artifact.storageClass }}</b></span>
+                  <span><small>Claimed by</small><b>{{ artifact.ecosystem }}</b></span>
+                  <span><small>Size</small><b>{{ formatObservedMeasurement(artifact.measured, "unavailable") }}</b></span>
                   <span :title="lastModifiedDisclosure"><small>Last modified</small><b>{{ lastModifiedValue(artifact.lastModified) }}</b></span>
                 </div>
-                <ul v-if="artifact.skipped.length" class="measurement-skip-list">
-                  <li v-for="skip in artifact.skipped" :key="`${skip.kind}:${skip.relativePath}`">
-                    <strong>{{ skip.relativePath }}</strong>
-                    <span>{{ projectSkipLabel(skip.kind) }} — {{ skip.reason }}</span>
-                  </li>
-                </ul>
+                <small>{{ artifact.boundary }}</small>
               </li>
             </ul>
-            <ul v-if="projectMeasurement.exclusions.length" class="exclusion-list">
-              <li v-for="rule in projectMeasurement.exclusions" :key="rule.rule">
-                <code>{{ rule.relativePath }}</code>
-                <span>{{ rule.matched ? "Applied; its bytes are not in the total" : "Matched nothing in this project" }}</span>
-              </li>
-            </ul>
-            <p class="measurement-boundary">{{ projectMeasurement.boundary }}</p>
-            <ul v-if="projectMeasurement.warnings?.length" class="docker-warnings">
-              <li v-for="warning in projectMeasurement.warnings" :key="warning">{{ warning }}</li>
-            </ul>
+
+            <div v-if="selectedProject.artifacts.length" class="project-measure-actions">
+              <button
+                class="secondary project-measure-button"
+                :disabled="Boolean(projectMeasuringPath) || projectLoading"
+                :title="projectMeasuringPath && projectMeasuringPath !== selectedProject.path ? `Waiting for the measurement of ${measuringProjectName} to finish or be cancelled` : ''"
+                @click="measureProject(selectedProject.path)"
+              >{{ projectMeasuringPath === selectedProject.path ? "Measuring…" : "Measure logical bytes" }}</button>
+              <button
+                v-if="projectMeasuringPath"
+                class="secondary project-cancel-button"
+                :disabled="projectCancelling"
+                @click="cancelProjectMeasurement"
+              >{{ projectCancelling ? "Cancelling…" : projectMeasuringPath === selectedProject.path ? "Cancel measurement" : `Cancel ${measuringProjectName} measurement` }}</button>
+            </div>
+
+            <section v-if="selectedProject.artifacts.length" class="panel measurement-scope" aria-labelledby="measurement-scope-title">
+              <div class="docker-subsection-heading">
+                <div>
+                  <p class="eyebrow">M4.2 · Measurement scope</p>
+                  <h4 id="measurement-scope-title">Exclusions for the next measurement</h4>
+                </div>
+                <span class="readonly-tag">Not persisted</span>
+              </div>
+              <p class="muted">One path per line, resolved against the <strong>approved root</strong>, not against this project. The backend validates every rule, rejects patterns, anything outside the root, and any path through a reparse point, then reports each rule with the result. An exclusion only removes bytes from the count; it can never re-include a path that a safety rule rejected.</p>
+              <textarea
+                v-model="projectExclusionInput"
+                aria-label="Exclusion paths, one per line"
+                placeholder="node_modules/.cache&#10;dist/reports"
+                rows="3"
+              ></textarea>
+              <p class="muted">{{ projectExclusions.length === 0 ? "No exclusion is applied; measurement will count every readable regular file." : `${projectExclusions.length} exclusion(s) will be sent with the next measurement.` }}</p>
+            </section>
+
+            <p v-if="projectMeasureError && projectMeasureErrorPath === selectedProject.path" class="error" role="alert">{{ projectMeasureError }}</p>
+
+            <p v-if="projectMeasuringPath === selectedProject.path" class="muted provider-loading" role="status" aria-live="polite">{{ projectCancelling ? "Cancelling; the partial count gathered so far will still be shown." : "Counting exact logical bytes; this can take a while on a large dependency tree. Use Cancel measurement above to stop early." }}</p>
+            <p v-else-if="projectMeasuringPath" class="muted provider-loading" role="status" aria-live="polite">Measuring {{ measuringProjectName }} in the background; only one measurement runs at a time.</p>
+
+            <section v-if="projectMeasurement && projectMeasurement.path === selectedProject.path" class="panel project-measurement" aria-labelledby="project-measurement-title" role="status" aria-live="polite">
+              <div class="docker-subsection-heading">
+                <div>
+                  <p class="eyebrow">Measured</p>
+                  <h4 id="project-measurement-title">Measured logical bytes for {{ projectMeasurement.name }}</h4>
+                </div>
+                <span :class="projectMeasurementAuthoritative ? 'readonly-tag' : 'review-tag'" :title="projectMeasurement.cancelled ? 'Stopped by an explicit Cancel measurement request' : ''">{{ projectCountLabel(projectMeasurement) }}</span>
+              </div>
+              <div class="artifact-metrics">
+                <span><small>Project total (logical)</small><b>{{ measuredValue(projectMeasurement.total) }}</b></span>
+                <span><small>Reclaimable</small><b>{{ measuredValue(projectMeasurement.reclaimable) }}</b></span>
+                <span><small>Artifacts measured</small><b>{{ projectMeasurement.artifacts.length }}</b></span>
+              </div>
+              <p class="muted">{{ projectMeasurement.message }}</p>
+              <ul class="artifact-list">
+                <li v-for="artifact in projectMeasurement.artifacts" :key="artifact.path">
+                  <div class="artifact-title">
+                    <strong>{{ artifact.name }}</strong>
+                    <span :class="artifact.complete && !artifact.truncated ? 'readonly-tag' : 'review-tag'">{{ countLabel(artifact) }}</span>
+                  </div>
+                  <div class="artifact-metrics">
+                    <span><small>Logical bytes</small><b>{{ measuredValue(artifact.measured) }}</b></span>
+                    <span><small>Files · directories</small><b>{{ artifact.files }} · {{ artifact.directories }}</b></span>
+                    <span><small>Reclaimable</small><b>{{ measuredValue(artifact.reclaimable) }}</b></span>
+                    <span :title="lastModifiedDisclosure"><small>Last modified</small><b>{{ lastModifiedValue(artifact.lastModified) }}</b></span>
+                  </div>
+                  <ul v-if="artifact.skipped.length" class="measurement-skip-list">
+                    <li v-for="skip in artifact.skipped" :key="`${skip.kind}:${skip.relativePath}`">
+                      <strong>{{ skip.relativePath }}</strong>
+                      <span>{{ projectSkipLabel(skip.kind) }} — {{ skip.reason }}</span>
+                    </li>
+                  </ul>
+                </li>
+              </ul>
+              <ul v-if="projectMeasurement.exclusions.length" class="exclusion-list">
+                <li v-for="rule in projectMeasurement.exclusions" :key="rule.rule">
+                  <code>{{ rule.relativePath }}</code>
+                  <span>{{ rule.matched ? "Applied; its bytes are not in the total" : "Matched nothing in this project" }}</span>
+                </li>
+              </ul>
+              <p class="measurement-boundary">{{ projectMeasurement.boundary }}</p>
+              <ul v-if="projectMeasurement.warnings?.length" class="docker-warnings">
+                <li v-for="warning in projectMeasurement.warnings" :key="warning">{{ warning }}</li>
+              </ul>
+            </section>
           </section>
 
           <details v-if="projectDiscovery.skipped.length" class="project-skipped">

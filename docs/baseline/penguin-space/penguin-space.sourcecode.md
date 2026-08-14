@@ -4,7 +4,7 @@ pack: "penguin-space"
 document: "sourcecode"
 status: "active"
 updated: "2026-08-14"
-code_ref: "2cb0989 (M4.3 Last modified implementation)"
+code_ref: "f7189e1 (M4.3 project detail, M4.3 complete)"
 ---
 
 # Architecture and implementation

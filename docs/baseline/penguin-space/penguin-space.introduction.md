@@ -4,7 +4,7 @@ pack: "penguin-space"
 document: "introduction"
 status: "active"
 updated: "2026-08-14"
-code_ref: "2cb0989 (M4.3 Last modified implementation)"
+code_ref: "f7189e1 (M4.3 project detail, M4.3 complete)"
 ---
 
 # PenguinSpace baseline
@@ -157,6 +157,16 @@ It is not a generic PC cleaner or merely a GUI for cache-clearing commands. Its 
 - The fixed modification-not-usage disclosure sentence accompanies every rendering of the value in Vue; nothing sorts, ranks, badges, or preselects on it, honoring the decision above.
 - `docker compose run --rm verify` passed bindings (18 methods, 10 enums, 38 models), Vue type-check/build, gofmt, vet, and all internal tests. A semantic review found no Critical issue; its High and Medium findings were fixed before this checkpoint.
 - No filesystem path was created, modified, or removed, and this has not been exercised through the Windows UI. Project detail remains the one open part of M4.3.
+
+## Save checkpoint — M4.3 project detail (M4.3 complete)
+
+**Code reference:** `f7189e1` (`feat(projects): add shared project detail panel for M4.3`).
+
+- The Projects surface now shows a compact summary per project plus one shared detail panel for whichever project is selected; the exclusion textarea, Measure/Cancel controls, and measurement result live only in that panel, scoped to the selected project's path.
+- Switching projects mid-measurement can no longer leak a stale result or error into the wrong panel; a background measurement for another project stays cancellable and visibly explained from wherever the user is looking.
+- Frontend-only change; no backend, model, or binding was touched. `docker compose run --rm verify` passed unchanged bindings (18 methods, 10 enums, 38 models) plus Vue type-check/build. A semantic review's one High and two Medium findings were fixed before this commit.
+- This completes M4.3. M4.4 — one reviewed exact project-artifact removal — is the next milestone phase; it remains unauthorized until its own implementation and evidence.
+- `scripts/build-windows.ps1 -Version 0.1.6` produced `out/penguinspace-v0.1.6.exe` (14,029,312 bytes; SHA-256 `c26bc5b0a792881e319f70574df78cab6f7c969c55ff732fc07dbaee99e9030b`) without replacing any prior artifact; `build/config.yml` and `frontend/package.json` are aligned at `0.1.6`. This build packages the full M4.2 measurement surface and the complete M4.3 work (cancellation, Last modified, project detail) for the pending Windows UAT; the executable has not yet been launched by the operator.
 
 ## Storage model
 
